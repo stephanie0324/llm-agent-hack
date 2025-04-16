@@ -1,0 +1,6 @@
+streamlit>=1.30,<2.0
+openai>=1.20,<2.0
+python-weather==1.0.3
+langchain_community>=0.2,<0.3
+langgraph>=0.3.28,<0.4
+langchain-openai
