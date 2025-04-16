@@ -82,6 +82,13 @@ bash script/build-docker-image.sh
 docker-compose up -d
 ```
 
+4. Run Dev
+```
+bash script/run-dev-mode.sh
+
+streamlit run travel_app.py --server.port=8501
+```
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- LICENSE -->

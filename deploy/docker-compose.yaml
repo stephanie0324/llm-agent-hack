@@ -2,9 +2,10 @@ version: "3.9"
 
 services:
   travel-agent:
-    image: stephC/llm-agent-travel:1.0.0-src 
+    image: stephC/llm-agent-travel:1.0.0-src
+    ports:
       - "8501:8501"
     volumes:
       - .:/app  
     environment:
-      - PYTHONUNBUFFERED=1  
+      - PYTHONUNBUFFERED=1
