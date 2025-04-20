@@ -4,3 +4,6 @@ python-weather==1.0.3
 langchain_community>=0.2,<0.3
 langgraph>=0.3.28,<0.4
 langchain-openai
+nest_asyncio
+pydantic==2.7.
+pydantic-settings==2.3.3

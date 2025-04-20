@@ -1,94 +1,185 @@
-import time
-import python_weather
 from langchain.tools import tool
+from typing import TypedDict
+from datetime import datetime, timedelta
+import requests
+import urllib3
+from config import settings
+
+# Suppress SSL warnings if needed
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Set LLM Model
+model_config = settings.MODEL_CONFIG.root
+
+
+class FormatInput(TypedDict):
+    itinerary: str
+    language: str
+
+
+# ==========================================================
+# TOOLS
+# ==========================================================
 
 
 @tool
-def search_places(destination: str, interest: str) -> str:
+def get_weather(city: str, days: int) -> str:
     """
-    🔍 Simulate a place search by generating LLM-friendly output.
-    """
-    try:
-        return (
-            f"Please recommend popular places in {destination} for someone interested in {interest}.\n"
-            f"Include famous attractions, food spots, or cultural sites if relevant. Add emojis!"
-        )
-    except Exception as e:
-        return f"❌ Error: Could not simulate search. {str(e)}"
-
-
-@tool
-def get_weather(destination: str) -> str:
-    """
-    🌦️ Get the current weather for a given travel destination.
+    🌦️ Get the weather forecast for a specific city and date range.
 
     Args:
-        destination (str): The location you'd like the weather for (e.g., "Osaka").
+        city (str): City name (e.g., "Tokyo").
+        days (int): Number of days to fetch the forecast.
 
     Returns:
-        str: Current temperature and weather description.
+        str: Weather information for the specified date range.
     """
+    base_url = "https://api.weatherbit.io/v2.0/forecast/daily"
+    params = {
+        "city": city,
+        "days": days,
+        "lang": "en",
+        "units": "M",
+        "key": settings.WEATHER_API_KEY,
+    }
+
     try:
-        client = python_weather.Client(unit=python_weather.IMPERIAL)
-        weather = client.get(destination)
+        response = requests.get(base_url, params=params, verify=False)
+        response.raise_for_status()
+        weather_data = response.json()
 
-        temp = weather.temperature
-        description = getattr(weather, "description", "No description available")
+        forecast = []
+        for day in weather_data["data"]:
+            date = datetime.strptime(day["datetime"], "%Y-%m-%d").date()
+            temp = day["temp"]
+            description = day["weather"]["description"]
+            forecast.append(f"📅 {date} — 🌡️ {temp}°C, 🌤️ {description}")
 
-        return (
-            f"🌍 Weather in {destination}:\n"
-            f"🌡️ Temperature: {temp}°F\n"
-            f"🌤️ Description: {description}"
-        )
+        return f"🌍 Weather Forecast for {city}:\n" + "\n".join(forecast)
 
-    except Exception as e:
-        return f"❌ Error: Unable to retrieve weather data for {destination}. {str(e)}"
+    except requests.exceptions.RequestException as e:
+        return f"❌ Error: Unable to retrieve weather data for {city}. {str(e)}"
+
+
+from langchain.agents import tool
 
 
 @tool
-def calculate_budget(destination: str, days: int) -> str:
+def generate_itinerary(
+    destination: str, days: int, interests: str, weather: str, budget: float
+) -> str:
     """
-    💰 Estimate your travel budget based on destination and length of stay.
+    🗺️ Generate a personalized itinerary with meals, transportation, and sightseeing based on destination, weather, and user preferences.
 
-    Args:
-        destination (str): Where you're going (e.g., "Seoul").
-        days (int): Number of days you'll stay.
-
-    Returns:
-        str: Estimated total cost (based on 1500 units/day).
+    Instructions:
+    1. Generate a {days}-day itinerary for {destination} based on the following:
+    2. Consider the user's interests: {interests}
+    3. Weather conditions: {weather}
+    4. Budget available: {budget} USD
+    5. Each day should include:
+       - 🍽️ Breakfast, lunch, and dinner (dish names or restaurant suggestions)
+       - 🌟 Two activities (places to visit or things to do)
+       - 🚇 Suggested transport (public, taxi, rental, etc.)
+       - 🌧️ A weather-based tip (e.g., "Bring an umbrella")
     """
+
     try:
-        cost = days * 1500
-        return (
-            f"💸 Estimated budget for {days} days in {destination}: {cost} 💰 "
-            f"(based on 1500 per day). ✈️🧳"
-        )
+        # The docstring now contains all the instructions for the tool logic.
+        # This is the part where the actual LLM model will be expected to understand and execute the prompt
+        # based on the information provided by the tool's inputs.
+
+        # Generate itinerary based on the description and return the output.
+        # For now, we just return a placeholder response (you can customize it based on your needs).
+        itinerary = f"Here's your {days}-day itinerary for {destination}: \n"
+        itinerary += f"Interests: {interests} \n"
+        itinerary += f"Weather: {weather} \n"
+        itinerary += f"Budget: {budget} USD \n"
+        itinerary += "\nEach day includes:\n"
+
+        # Example day structure (this can be extended or modified to match your exact needs)
+        for i in range(1, days + 1):
+            itinerary += f"Day {i}: \n"
+            itinerary += "🍽️ Breakfast: [Dish/Restaurant suggestion] \n"
+            itinerary += "🌟 Activity 1: [Place/Activity suggestion] \n"
+            itinerary += "🌟 Activity 2: [Place/Activity suggestion] \n"
+            itinerary += (
+                "🚇 Suggested transport: [Public transport/Taxi/Rental suggestion] \n"
+            )
+            itinerary += "🌧️ Weather tip: [Tip based on the weather] \n"
+
+        return itinerary
+
     except Exception as e:
-        return f"❌ Error: Unable to calculate budget. {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 
 @tool
-def generate_itinerary(destination: str, days: int, interests: str) -> str:
+def format_itinerary(itinerary: dict, language: str) -> str:
     """
-    🗺️ Create a personalized travel itinerary.
+    Formats the given itinerary into a markdown-styled table with days as columns and adds a title based on the language.
 
     Args:
-        destination (str): Where you're headed (e.g., "Bangkok").
-        days (int): Number of days you'll spend there.
-        interests (str): Comma-separated list of interests (e.g., "food, temples, shopping").
+        itinerary (dict): A dictionary containing details for each day (meals, activities, transport, weather tips).
+        language (str): The language for the itinerary title.
 
     Returns:
-        str: A simple 3-day travel itinerary.
+        str: A markdown-formatted table with the itinerary and a title.
     """
-    try:
-        interest_list = interests.split(", ")
-        plan = " 🎯 ".join(interest_list)
+    # Language-based title map
+    title_map = {
+        "en": "🧳 Here is your travel itinerary!",
+        "ja": "🧳 あなたの旅行プランはこちら！",
+        "ko": "🧳 여행 일정이 준비되었습니다!",
+        "zh-tw": "🧳 您的旅遊行程如下！",
+    }
+    title = title_map.get(language, title_map["en"])
 
-        return (
-            f"🗺️ Suggested {days}-day itinerary in {destination}:\n"
-            f"📅 Day 1: Arrival & explore nearby 🛬\n"
-            f"📅 Day 2: Activities around {plan} 🏖️🍜🎨\n"
-            f"📅 Day 3: Chill, shop, and head home 🧘‍♂️🛍️✈️"
-        )
-    except Exception as e:
-        return f"❌ Error: Unable to generate itinerary. {str(e)}"
+    # Create the table header with days as columns
+    days = len(itinerary)
+    header = "| Meal | " + " | ".join([f"Day {i+1}" for i in range(days)]) + " |"
+    separator = "|------|" + "|---------|" * days
+
+    # Add data rows
+    meals = (
+        "| Breakfast, Lunch, Dinner | "
+        + " | ".join([itinerary[f"Day {i+1}"]["meal"] for i in range(days)])
+        + " |"
+    )
+    activities1 = (
+        "| Activity 1 | "
+        + " | ".join([itinerary[f"Day {i+1}"]["activity1"] for i in range(days)])
+        + " |"
+    )
+    activities2 = (
+        "| Activity 2 | "
+        + " | ".join([itinerary[f"Day {i+1}"]["activity2"] for i in range(days)])
+        + " |"
+    )
+    transport = (
+        "| Transport | "
+        + " | ".join([itinerary[f"Day {i+1}"]["transport"] for i in range(days)])
+        + " |"
+    )
+    weather = (
+        "| Weather Tip | "
+        + " | ".join([itinerary[f"Day {i+1}"]["weather_tip"] for i in range(days)])
+        + " |"
+    )
+
+    # Constructing the full markdown output
+    table = f"""
+    # {title}
+
+    ```markdown
+    {header}
+    {separator}
+    {meals}
+    {activities1}
+    {activities2}
+    {transport}
+    {weather}
+    ✈️ Safe travels and have fun!
+    ```
+    """
+
+    return table

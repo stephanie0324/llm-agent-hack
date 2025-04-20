@@ -1,6 +1,6 @@
 import streamlit as st
 import datetime
-from agent import create_travel_agent_graph
+from agent import create_travel_agent
 
 st.set_page_config(page_title="Travel Buddy", page_icon="🧳")
 st.title("🧳 Travel Buddy ✈️ - Your Personal Travel Agent")
@@ -21,11 +21,50 @@ with st.sidebar:
 
     days = (end_date - start_date).days if end_date >= start_date else 0
 
+    # Budget input
+    st.subheader("💰 Set Your Budget (Optional)")
+
+    budget_currency = st.selectbox(
+        "Choose your budget currency 💸",
+        ["USD", "EUR", "JPY", "GBP", "AUD", "TWD"],  # Removed CNY and added TWD
+        index=0,
+    )
+
+    budget_amount = st.number_input(
+        f"Enter your budget in {budget_currency}:", min_value=0, value=1000, step=10
+    )
+
+    # 💸 Preferences: Hotel & Flight Budget
+    with st.expander("💸 Flight & Hotel Preferences (Optional)", expanded=False):
+        flight_class = st.radio(
+            "Select flight class:",
+            ["Budget", "Economy", "Business", "First"],
+            index=1,
+            horizontal=True,
+        )
+
+        with_luggage = st.checkbox("Include checked luggage?", value=True)
+
+        hotel_stars = st.select_slider(
+            "Preferred hotel star rating:",
+            options=["1★", "2★", "3★", "4★", "5★"],
+            value="3★",
+        )
+
     interests = st.multiselect(
         "What are your interests? 🧐",
         ["Food 🍣", "Shopping 🛍️", "History 🏰", "Nature 🌳"],
         default=["Food 🍣"],
     )
+
+    language = st.selectbox(
+        "Choose your preferred language 🌐",
+        ["English", "日本語", "한국어", "繁體中文"],
+        index=0,
+    )
+
+    lang_map = {"English": "en", "日本語": "ja", "한국어": "ko", "繁體中文": "zh-tw"}
+    lang_code = lang_map[language]
 
 user_input = st.text_input(
     "What do you want to ask? 💬 (e.g., Help me plan an itinerary!)"
@@ -38,62 +77,55 @@ else:
     formatted_interests = ", ".join(interests)
 
     prompt = (
-        f"I'm planning a trip to {destination} from {start_date} to {end_date}.\n"
-        f"You have to use the tools to help me with the following:\n"
-        f"📅 Use the get_weather tool to check the weather for each day. Pass the query as 'destination: {destination}'.\n"
-        f"🗺️ Use the generate_itinerary tool to create a personalized itinerary based on the weather and interests: {formatted_interests}. Pass the query as 'destination: {destination}, days: {days}, interests: {formatted_interests}'.\n"
-        f"📍 Use the search_places tool to recommend places in {destination} based on the interest '{formatted_interests}'. Pass the query as 'destination: {destination}, interest: {formatted_interests}'.\n"
+        f"I'm planning a trip to {destination} from {start_date} to {end_date}. With the budget of {budget_amount} in {budget_currency}\n"
+        f"You have to use the tools to help me with the following (in language: {lang_code}):\n\n"
+        f"📅 **get_weather** tool:\n"
+        f"- Query: destination: {destination}, language: {lang_code}\n\n"
+        f"🗺️ **generate_itinerary** tool:\n"
+        f"- Query: destination: {destination}, days: {days}, interests: {formatted_interests}, language: {lang_code}\n\n"
+        f"- 💡 Use the weather forecast (from get_weather) to avoid recommending places affected by bad weather (like rain or storms).\n\n"
         f"Please help answer the following based on these conditions:\n"
         f"- Destination: {destination} 🌏\n"
         f"- Start Date: {start_date} 📅\n"
         f"- End Date: {end_date} 📅\n"
         f"- Days: {days} 🌞\n"
         f"- Interests: {formatted_interests} 🏖️\n"
-        f"- Question: {user_input} ❓\n"
-        f"Weather Information Requests:\n"
-        f"- Based on the given weather for each day, please plan the itinerary considering the weather conditions."
+        f"- Language: {lang_code} 🈶\n"
+        f"- Flight class: {flight_class}\n"
+        f"- Include luggage: {'Yes' if with_luggage else 'No'}\n"
+        f"- Hotel preference: {hotel_stars} hotel\n"
+        f"- Budget: {budget_amount} {budget_currency}\n"
+        f"- Question: {user_input} ❓\n\n"
     )
 
-    agent_graph = create_travel_agent_graph()
+    agent = create_travel_agent()
 
     with st.spinner("Your travel buddy is thinking... 🧳💭"):
-        final_response = ""
-        final_markdown = ""
-        step_container = st.container()
-        final_placeholder = st.empty()
+        output_box = st.empty()
+        response_text = ""
+        done_streaming = False  # Add a flag to indicate when streaming is done
 
         try:
-            output_events = agent_graph.stream(
+            # Start streaming the agent's response
+            for event in agent.stream(
                 {"messages": [{"role": "user", "content": prompt}]}
-            )
-
-            for event in output_events:
-                st.write("📬 Event:", event)
-
-                # Handle tool output
-                tools = event.get("tools")
-                if tools:
-                    for message in tools.get("messages", []):
-                        tool_content = getattr(message, "content", None)
-                        if tool_content:
-                            step_container.markdown(
-                                f"📤 **Tool Output**:\n{tool_content}"
-                            )
-                            final_response += f"{tool_content}\n\n"
-
-                # Handle final agent output
+            ):
                 if "agent" in event:
-                    messages = event["agent"].get("messages", [])
-                    if messages and hasattr(messages[-1], "content"):
-                        final_markdown = messages[-1].content
+                    for msg in event["agent"].get("messages", []):
+                        content = getattr(msg, "content", None)
 
-            if final_markdown:
-                final_placeholder.markdown("## ✅ Final Summary")
-                final_placeholder.markdown(final_markdown)
-            else:
-                final_placeholder.warning(
-                    "⚠️ No final response was received from the agent."
-                )
+                        if content:
+                            response_text += content
+                            output_box.markdown(
+                                response_text + "▌"
+                            )  # Update with the cursor effect
+
+                            done_streaming = True
+
+                if done_streaming:
+                    # Once the stream ends, update the output box to show the final result without cursor
+                    output_box.markdown(response_text)
+                    done_streaming = False  # Reset the flag
 
         except Exception as e:
-            st.error(f"An error occurred while getting the response: {str(e)}")
+            st.error(f"❌ Error while streaming: {str(e)}")
