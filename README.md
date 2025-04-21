@@ -86,7 +86,7 @@ docker-compose up -d
 ```
 bash script/run-dev-mode.sh
 
-streamlit run travel_app.py --server.port=8501
+streamlit run travel_app.py --server.port=8501 --server.address=0.0.0.0 --server.runOnSave=True
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
