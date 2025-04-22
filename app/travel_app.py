@@ -1,270 +1,266 @@
+import json
+import re
 import datetime
-
 import streamlit as st
 from agent import create_travel_agent
 
-st.set_page_config(page_title="Travel Buddy", page_icon="👛")
-st.title("👛 Travel Buddy ✈️ - Your Personal Travel Agent")
+st.set_page_config(page_title="Travel Buddy", page_icon="💼")
+st.title("💼 Travel Buddy ✈️ - Your Personal Travel Agent")
 
+# ======= set state ==========
+if "itineraries" not in st.session_state:
+    st.session_state.itineraries = None
+if "selected_plan" not in st.session_state:
+    st.session_state.selected_plan = None
+
+# Sidebar Inputs
 with st.sidebar:
-    destination = st.text_input("Where do you want to go? 🌍", "Tokyo")
-    start_date = st.date_input("Select your travel start date 🗕️", datetime.date.today())
-    end_date = st.date_input(
-        "Select your travel end date 🗕️", start_date + datetime.timedelta(days=3)
-    )
+    with st.container(border=True):
+        st.header("⚙️ Settings")
+        language = st.selectbox("Language", ["English", "日本語", "한국어", "繁體中文"])
+        lang_code = {
+            "English": "en",
+            "日本語": "ja",
+            "한국어": "ko",
+            "繁體中文": "zh-tw",
+        }[language]
 
-    if end_date < start_date:
-        st.error(
-            "End date cannot be earlier than the start date. Please select a valid range."
-        )
+    with st.container(border=True):
+        st.header("📍 Destination & Dates")
+        col1, col2 = st.columns(2)
+        with col1:
+            destination = st.text_input("Destination", "Tokyo")
+        with col2:
+            date_range = st.date_input(
+                "🗓️ Travel Dates (Start - End)",
+                [
+                    datetime.date.today(),
+                    datetime.date.today() + datetime.timedelta(days=3),
+                ],
+            )
+            if len(date_range) != 2:
+                st.error("Please select both a start and an end date.")
+            else:
+                start_date, end_date = date_range
+                if end_date < start_date:
+                    st.error("End date cannot be earlier than the start date.")
+                    days = 0
+                else:
+                    days = (end_date - start_date).days
 
-    days = (end_date - start_date).days if end_date >= start_date else 0
+    with st.container(border=True):
+        st.header("💰 Budget")
 
-    # 💰 Budget slider
-    st.subheader("💰 Set Your Budget (Optional)")
-    budget_currency = st.selectbox(
-        "Choose your budget currency 💸",
-        ["USD", "EUR", "JPY", "GBP", "AUD", "TWD"],
-        index=0,
-    )
-    budget_amount = st.slider(
-        "Select your budget range:",
-        min_value=0,
-        max_value=100000,
-        value=20000,
-        step=1000,
-    )
+        st.markdown("#### 🔢 Allocate Your Budget")
 
-    # 💸 Preferences: Flight & Hotel
-    with st.expander("💸 Flight & Hotel Preferences (Optional)", expanded=False):
-        flight_class = st.radio(
-            "Select flight class:",
-            ["Budget", "Economy", "Business", "First"],
-            index=1,
-            horizontal=True,
+        col1, col2 = st.columns(2)
+        with col1:
+            flight_budget = st.number_input(
+                "Flight Budget", min_value=0, value=10000, step=500
+            )
+        with col2:
+            hotel_budget = st.number_input(
+                "Hotel Budget", min_value=0, value=15000, step=500
+            )
+
+        # 計算最小總預算
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            min_total_budget = flight_budget + hotel_budget
+
+            total_budget = st.slider(
+                "Total Budget",
+                min_value=min_total_budget,
+                max_value=100000,
+                value=max(min_total_budget, 30000),  # 預設值不能比 min 小
+                step=1000,
+            )
+        with col2:
+            budget_currency = st.selectbox(
+                "Currency", ["USD", "EUR", "JPY", "GBP", "AUD", "TWD"]
+            )
+
+        st.success(
+            f"✅ Remaining Budget: {total_budget - (flight_budget + hotel_budget)}"
         )
-        airline_preference = st.text_input("Preferred airline (optional):")
-        flight_time_pref = st.selectbox(
-            "Preferred flight time:",
-            ["Any", "Morning", "Afternoon", "Evening", "Red-eye"],
-        )
-        with_luggage = st.checkbox("Include checked luggage?", value=True)
-        hotel_stars = st.select_slider(
-            "Preferred hotel star rating:",
-            options=["1★", "2★", "3★", "4★", "5★"],
-            value="3★",
-        )
-        hotel_type = st.multiselect(
-            "Preferred hotel types:",
-            ["Hotel", "Hostel", "Airbnb", "Ryokan", "Capsule", "Resort"],
-        )
-        hotel_features = st.multiselect(
-            "Hotel preferences:",
+        with st.expander("Advanced Settings"):
+            st.markdown("### ✈️ Flight Preferences")
+            flight_class = st.radio(
+                "Flight Class",
+                ["Budget", "Economy", "Business", "First"],
+                horizontal=True,
+            )
+            col1, col2 = st.columns(2)
+            with col1:
+                flight_time_pref = st.selectbox(
+                    "Flight Time", ["Any", "Morning", "Afternoon", "Evening", "Red-eye"]
+                )
+            with col2:
+                airline_preference = st.text_input("Preferred Airline")
+            col1, col2 = st.columns(2)
+            with col1:
+                with_luggage = st.checkbox("Checked Luggage", value=True)
+            with col2:
+                non_stop = st.checkbox("Non Stop Flight", value=True)
+
+            st.markdown("### 🏨 Hotel Preferences")
+            col3, col4 = st.columns(2)
+            with col3:
+                hotel_stars = st.select_slider(
+                    "Hotel Rating", ["1★", "2★", "3★", "4★", "5★"], value="3★"
+                )
+                hotel_features = st.multiselect(
+                    "Hotel Features",
+                    [
+                        "Non-smoking",
+                        "Bathtub",
+                        "Breakfast Included",
+                        "Near Station",
+                        "Late Checkout",
+                    ],
+                    default=["Non-smoking", "Breakfast Included", "Near Station"],
+                )
+            with col4:
+                hotel_type = st.multiselect(
+                    "Hotel Type",
+                    ["Hotel", "Hostel", "Airbnb", "Ryokan", "Capsule", "Resort"],
+                )
+
+    with st.container(border=True):
+        st.header("✨ Personalization")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            travel_companions = st.radio(
+                "Traveling With",
+                ["Solo", "Couple", "Family", "Friends", "Business"],
+                horizontal=True,
+            )
+        with col2:
+            transportation = st.selectbox(
+                "Preferred Transportation",
+                ["Public Transport", "Taxi/Car-hailing", "Car Rental", "Walking Only"],
+            )
+
+        travel_style = st.multiselect(
+            "Travel Style",
             [
-                "Non-smoking",
-                "Bathtub",
-                "Breakfast Included",
-                "Near Station",
-                "Late Checkout",
+                "Relaxed & Chill 😌",
+                "Adventurous 🧷",
+                "Cultural & Historical 🏛️",
+                "Luxury 💎",
+                "Backpacking 🎒",
+                "Family-Friendly 👨‍👩‍👧‍👦",
+                "Romantic 💖",
+                "Party & Nightlife 🎉",
+                "Eco & Nature 🌿",
             ],
+            default=["Relaxed & Chill 😌", "Luxury 💎"],
         )
 
-    st.subheader("🚀 Customize Your Travel Experience")
-    travel_companions = st.radio(
-        "Who are you traveling with?",
-        ["Solo", "Couple", "Family", "Friends", "Business"],
-        index=0,
+        col3, col4 = st.columns(2)
+        with col3:
+            dietary = st.multiselect(
+                "Dietary Needs",
+                [
+                    "None",
+                    "Vegetarian",
+                    "Vegan",
+                    "Halal",
+                    "Kosher",
+                    "Gluten-Free",
+                    "Seafood Allergy",
+                ],
+                default=["None"],
+            )
+        with col4:
+            interests = st.multiselect(
+                "Interests",
+                [
+                    "Food 🍣",
+                    "Shopping 💼",
+                    "History 🌰",
+                    "Nature 🌳",
+                    "Nightlife 🎉",
+                    "Art & Culture 🎨",
+                    "Photography 📸",
+                    "Theme Parks 🎡",
+                    "Hot Springs ♨️",
+                    "Museum 🖼️",
+                    "Concert 🎶",
+                    "Hiking 🦼",
+                ],
+                default=["Food 🍣"],
+            )
+
+# 根據語言設置按鈕文字
+button_text = "Generate Itinerary"
+if language == "繁體中文":
+    button_text = "生成行程"
+elif language == "日本語":
+    button_text = "行程を生成"
+elif language == "한국어":
+    button_text = "여행 일정 생성"
+# 如果按下按鈕，觸發行程生成
+if st.button(button_text):
+    # 呼叫 create_travel_agent 並執行後續邏輯
+    agent = create_travel_agent()
+
+    # 生成的 prompt 和處理流程
+    prompt = f"""
+    Please help plan a personalized itinerary with the following information:
+    
+    Total Days: {days}
+    Destination: {destination}
+    Start Date: {start_date}
+    End Date: {end_date}
+    Budget: {total_budget} {budget_currency}
+
+    Flight Preferences:
+    - Flight Budget: {flight_budget}
+    - Class: {flight_class}
+    - Preferred Time: {flight_time_pref}
+    - Preferred Airline: {airline_preference or "None"}
+    - Checked Luggage: {'Yes' if with_luggage else 'No'}
+    - Non-Stop Flight: {'Yes' if non_stop else 'No'}
+
+    Hotel Preferences:
+    - Hotel Budget: {hotel_budget}
+    - Stars: {hotel_stars}
+    - Features: {', '.join(hotel_features) if hotel_features else 'None'}
+    - Type: {', '.join(hotel_type) if hotel_type else 'None'}
+
+    Companions: {travel_companions}
+    Transportation Preference: {transportation}
+    Travel Style: {', '.join(travel_style) if travel_style else 'None'}
+    Dietary Requirements: {', '.join(dietary) if dietary else 'None'}
+    Interests: {', '.join(interests) if interests else 'None'}
+    Remaining Budget: {total_budget - (flight_budget + hotel_budget)}
+
+    Language: {lang_code}
+    You need to use format_itinerary to return the result in json format and only the json format.
+    """
+    response = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
+
+    # 解析回應並儲存
+    raw_content = response["messages"][-1].content
+    cleaned = re.search(r"```json(.*?)```", raw_content, re.DOTALL)
+    itineraries = (
+        json.loads(cleaned.group(1).strip())
+        if cleaned
+        else json.loads(raw_content.strip())
     )
-    transportation = st.selectbox(
-        "Preferred transportation within the destination:",
-        ["Public Transport", "Taxi/Car-hailing", "Car Rental", "Walking Only"],
-    )
-    dietary = st.multiselect(
-        "Do you have any dietary preferences or restrictions?",
-        [
-            "None",
-            "Vegetarian",
-            "Vegan",
-            "Halal",
-            "Kosher",
-            "Gluten-Free",
-            "Seafood Allergy",
-        ],
-        default=["None"],
-    )
-    interests = st.multiselect(
-        "What are your interests? 🧐",
-        [
-            "Food 🍣",
-            "Shopping 🏍️",
-            "History 🏰",
-            "Nature 🌳",
-            "Nightlife 🎉",
-            "Art & Culture 🎨",
-            "Photography 📸",
-            "Theme Parks 🎡",
-            "Hot Springs",
-            "Museum",
-            "Concert",
-            "Hiking",
-        ],
-        default=["Food 🍣"],
-    )
 
-    language = st.selectbox(
-        "Choose your preferred language 🌐",
-        ["English", "日本語", "한국어", "繁體中文"],
-        index=0,
-    )
-    lang_map = {"English": "en", "日本語": "ja", "한국어": "ko", "繁體中文": "zh-tw"}
-    lang_code = lang_map[language]
+    # 儲存生成的計劃
+    st.session_state.itineraries = itineraries
+    st.session_state.selected_plan = None
 
-user_input = st.text_input(
-    "What do you want to ask? 💬 (e.g., Help me plan an itinerary!)"
-)
 
-if not user_input:
-    st.warning("Please enter a question or request to proceed.")
-else:
-    st.subheader("🧃 Recommended Travel Plans")
-
-    # mock API response with enriched detail
-    mock_itineraries = [
-        {
-            "title": "Cultural Explorer",
-            "highlights": ["Asakusa Temple", "Ueno Museum", "Tsukiji Food Tour"],
-            "total_cost": 18000,
-            "avg_per_day": 3600,
-            "details": [
-                {
-                    "day": 1,
-                    "schedule": [
-                        ("08:00", "Arrive at Tokyo Haneda Airport"),
-                        ("09:00", "Transfer to hotel (APA Hotel Asakusa)"),
-                        ("10:30", "Check-in and unpack"),
-                        ("12:00", "Lunch: Local sushi at Tsukiji"),
-                        ("14:00", "Visit Ueno Park & Museum"),
-                        ("17:30", "Return to hotel"),
-                        ("19:00", "Dinner: Ramen at Ichiran"),
-                        ("21:00", "Rest at hotel"),
-                    ],
-                },
-                {
-                    "day": 2,
-                    "schedule": [
-                        ("08:00", "Breakfast at hotel"),
-                        ("09:30", "Visit Sensoji Temple"),
-                        ("12:00", "Lunch: Tempura at Daikokuya"),
-                        ("14:00", "Tokyo National Museum tour"),
-                        ("18:00", "Dinner: Izakaya in Asakusa"),
-                        ("20:00", "Stroll along Sumida River"),
-                        ("22:00", "Return to hotel"),
-                    ],
-                },
-                {
-                    "day": 3,
-                    "schedule": [
-                        ("08:30", "Breakfast: Hotel buffet"),
-                        ("10:00", "Day trip to Ginza for shopping"),
-                        ("13:00", "Lunch: Michelin-star ramen"),
-                        ("15:00", "Explore Shibuya and Harajuku"),
-                        ("18:30", "Dinner: Shabu-shabu"),
-                        ("21:00", "Back to hotel and rest"),
-                    ],
-                },
-                {
-                    "day": 4,
-                    "schedule": [
-                        ("08:00", "Breakfast and check out"),
-                        ("09:30", "Airport transfer"),
-                        ("11:30", "Flight departs"),
-                    ],
-                },
-            ],
-        },
-        {
-            "title": "Nature & Relaxation",
-            "highlights": ["Hakone Hot Springs", "Lake Ashi", "Scenic Hike"],
-            "total_cost": 19000,
-            "avg_per_day": 3800,
-            "details": [
-                {
-                    "day": 1,
-                    "schedule": [
-                        ("09:00", "Depart for Hakone"),
-                        ("11:30", "Check-in at Yumoto Onsen Ryokan"),
-                        ("12:30", "Lunch: Kaiseki at Ryokan"),
-                        ("14:00", "Relax at hot springs"),
-                        ("18:00", "Dinner at Ryokan"),
-                        ("20:00", "Night stroll near lake"),
-                    ],
-                },
-                {
-                    "day": 2,
-                    "schedule": [
-                        ("08:00", "Breakfast at Ryokan"),
-                        ("09:30", "Lake Ashi cruise"),
-                        ("12:00", "Lunch: Lakeside cafe"),
-                        ("14:00", "Ropeway to Owakudani"),
-                        ("17:00", "Return to Ryokan for dinner"),
-                    ],
-                },
-                {
-                    "day": 3,
-                    "schedule": [
-                        ("09:00", "Check out and hike trail to Mt. Komagatake"),
-                        ("12:00", "Picnic lunch on trail"),
-                        ("15:00", "Return to Tokyo"),
-                    ],
-                },
-            ],
-        },
-        {
-            "title": "Urban Adventure",
-            "highlights": ["Shibuya Crossing", "SkyTree Tower", "Tokyo Disneyland"],
-            "total_cost": 20000,
-            "avg_per_day": 4000,
-            "details": [
-                {
-                    "day": 1,
-                    "schedule": [
-                        ("08:00", "Arrive in Tokyo"),
-                        ("09:30", "Drop luggage at hotel"),
-                        ("10:30", "SkyTree Observatory"),
-                        ("13:00", "Lunch: Tonkatsu"),
-                        ("15:00", "Asakusa street walk"),
-                        ("19:00", "Dinner and drinks in Shinjuku"),
-                    ],
-                },
-                {
-                    "day": 2,
-                    "schedule": [
-                        ("08:00", "Breakfast at hotel"),
-                        ("09:00", "Shopping in Harajuku"),
-                        ("12:00", "Lunch: Omurice"),
-                        ("14:00", "Ghibli Museum"),
-                        ("18:00", "Dinner: Yakitori in Ebisu"),
-                    ],
-                },
-                {
-                    "day": 3,
-                    "schedule": [
-                        ("07:00", "Train to Disneyland"),
-                        ("09:00", "Enter Disneyland"),
-                        ("12:30", "Lunch: Park cafe"),
-                        ("16:00", "Parade & shopping"),
-                        ("19:00", "Return to Tokyo"),
-                    ],
-                },
-            ],
-        },
-    ]
-
-    selected_plan = st.session_state.get("selected_plan", None)
-
-    if selected_plan is None:
-        cols = st.columns(len(mock_itineraries))
-        for idx, plan in enumerate(mock_itineraries):
+if st.session_state.itineraries:
+    # 顯示行程計劃的摘要，並可以查看詳情
+    if st.session_state.selected_plan is None:
+        cols = st.columns(len(st.session_state.itineraries))
+        for idx, plan in enumerate(st.session_state.itineraries):
             with cols[idx]:
                 st.markdown(f"### ✨ {plan['title']}")
                 st.markdown("**Trip Highlights:**")
@@ -276,57 +272,27 @@ else:
                     st.session_state.selected_plan = idx
                     st.rerun()
     else:
-        plan = mock_itineraries[selected_plan]
+        # 顯示選定的行程詳細資料
+        plan = st.session_state.itineraries[st.session_state.selected_plan]
         st.markdown(f"## ✨ Detailed Itinerary: {plan['title']}")
         for day in plan["details"]:
             st.markdown(f"### Day {day['day']}")
             for time, item in day["schedule"]:
+                emoji = "⏰"  # Default emoji
                 if any(
                     keyword in item.lower()
-                    for keyword in [
-                        "breakfast",
-                        "lunch",
-                        "dinner",
-                        "ramen",
-                        "sushi",
-                        "tempura",
-                        "shabu",
-                    ]
+                    for keyword in ["breakfast", "lunch", "dinner"]
                 ):
                     emoji = "🍽️"
                 elif any(
-                    keyword in item.lower()
-                    for keyword in ["check-in", "check out", "hotel", "rest"]
+                    keyword in item.lower() for keyword in ["check-in", "check out"]
                 ):
                     emoji = "🛏️"
-                elif any(
-                    keyword in item.lower()
-                    for keyword in ["airport", "flight", "arrive", "depart"]
-                ):
+                elif any(keyword in item.lower() for keyword in ["airport", "flight"]):
                     emoji = "✈️"
-                elif any(
-                    keyword in item.lower()
-                    for keyword in [
-                        "museum",
-                        "temple",
-                        "park",
-                        "walk",
-                        "shopping",
-                        "tour",
-                        "hike",
-                    ]
-                ):
-                    emoji = "📍"
-                elif any(
-                    keyword in item.lower()
-                    for keyword in ["train", "taxi", "transfer", "ropeway"]
-                ):
-                    emoji = "🚆"
-                else:
-                    emoji = "⏰"
                 st.markdown(f"- {emoji} {time} → {item}")
         st.markdown(f"\n**Total Cost:** NT$ {plan['total_cost']:,}")
         st.markdown(f"**Avg/Day:** NT$ {plan['avg_per_day']:,}")
         if st.button("🔙 Back to all plans"):
-            del st.session_state.selected_plan
+            st.session_state.selected_plan = None
             st.rerun()

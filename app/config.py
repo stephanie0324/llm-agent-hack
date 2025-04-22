@@ -10,9 +10,13 @@ from schemas.llms_config_schema import LlmsConfig, ModelEntry
 class Settings(BaseSettings):
 
     # DEBUG模式，若為true會輸出chain執行的詳細過程.
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     WEATHER_API_KEY: str = ""
+
+    # Agent
+    AGENT_CONNECTION_STRING: str = ""
+    AGENT_ID: str = ""
 
     LOCAL_MODEL_NAME: str = "microsoft/phi-4"
     LOCAL_MODEL_API: str = ""

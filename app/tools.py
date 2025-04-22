@@ -1,9 +1,12 @@
 from langchain.tools import tool
-from typing import TypedDict
+from typing import TypedDict, Optional, List
 from datetime import datetime, timedelta
+from pydantic import BaseModel, Field
 import requests
 import urllib3
+
 from config import settings
+from utils import get_response_from_ai_service
 
 # Suppress SSL warnings if needed
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -12,9 +15,29 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 model_config = settings.MODEL_CONFIG.root
 
 
+# === Schemas ===
 class FormatInput(TypedDict):
     itinerary: str
     language: str
+
+
+class ScheduleItem(BaseModel):
+    time: str = Field(..., description="活動開始的時間，例如 '08:00'")
+    activity: str = Field(..., description="活動內容，例如 'Visit Asakusa Temple'")
+    cost: int = Field(..., description="此活動的花費（單位：日幣）")
+
+
+class DaySchedule(BaseModel):
+    day: int = Field(..., description="第幾天的行程")
+    schedule: List[ScheduleItem] = Field(..., description="此天的詳細行程表")
+
+
+class ItineraryPlan(BaseModel):
+    title: str = Field(..., description="行程標題，簡短描述此行程主題")
+    highlights: List[str] = Field(..., description="從整個行程中擷取出來的三個亮點活動")
+    total_cost: int = Field(..., description="整趟行程的總費用（日幣）")
+    avg_per_day: float = Field(..., description="平均每日費用（日幣）")
+    details: List[DaySchedule] = Field(..., description="完整的每日行程安排")
 
 
 # ==========================================================
@@ -23,21 +46,22 @@ class FormatInput(TypedDict):
 
 
 @tool
-def get_weather(city: str, days: int) -> str:
+def get_weather(city: str, start_date: str, end_date: str) -> str:
     """
     🌦️ Get the weather forecast for a specific city and date range.
 
     Args:
         city (str): City name (e.g., "Tokyo").
-        days (int): Number of days to fetch the forecast.
+        start_date (str): Start date in "YYYY-MM-DD" format.
+        end_date (str): End date in "YYYY-MM-DD" format.
 
     Returns:
-        str: Weather information for the specified date range.
+        str: Weather information within the specified date range.
     """
     base_url = "https://api.weatherbit.io/v2.0/forecast/daily"
     params = {
         "city": city,
-        "days": days,
+        "days": 16,
         "lang": "en",
         "units": "M",
         "key": settings.WEATHER_API_KEY,
@@ -61,125 +85,162 @@ def get_weather(city: str, days: int) -> str:
         return f"❌ Error: Unable to retrieve weather data for {city}. {str(e)}"
 
 
-from langchain.agents import tool
+@tool
+def search_flight(
+    departure_city: str,
+    destination_city: str,
+    start_date: str,
+    end_date: str,
+    flight_budget: float,
+    flight_class: str,
+    flight_time_pref: str,
+    airline_preference: str,
+    with_luggage: bool,
+    non_stop: bool,
+):
+    """
+    ✈️ Search for return flights based on user preferences, ensuring at least 10 flight options within the budget.
+
+    Args:
+        departure_city (str): City of departure.
+        destination_city (str): City of destination.
+        start_date (str): Departure date in YYYY-MM-DD format.
+        end_date (str): Return date in YYYY-MM-DD format.
+        flight_budget (float): Maximum budget for the round-trip flight.
+        flight_class (str): Flight class preference (Budget, Economy, Business, First).
+        flight_time_pref (str): Preferred flight time (Any, Morning, Afternoon, Evening, Red-eye).
+        airline_preference (str): Preferred airline name.
+        with_luggage (bool): Whether the user wants checked luggage.
+        non_stop (bool): Whether the user prefers a non-stop flight.
+
+    Returns:
+        str: Flight search results with at least 10 options within budget.
+    """
+    try:
+        query = f"""
+        Search for return flights from {departure_city} to {destination_city} between {start_date} and {end_date}.
+        The user has a budget of ${flight_budget}. 
+        Flight class preference: {flight_class}.
+        Preferred flight time: {flight_time_pref}.
+        Preferred airline: {airline_preference}.
+        Include checked luggage: {'Yes' if with_luggage else 'No'}.
+        Non-stop flight: {'Yes' if non_stop else 'No'}.
+        Please return at least 10 flight options that fall within the budget, including round-trip flights with details 
+        such as flight times, layovers, and pricing.
+        """
+        return get_response_from_ai_service(query)
+
+    except requests.exceptions.RequestException as e:
+        return f"❌ Error: Unable to retrieve flight data for {departure_city} to {destination_city}. {str(e)}"
 
 
 @tool
-def generate_itinerary(
-    destination: str, days: int, interests: str, weather: str, budget: float
+def search_and_generate_itinerary(
+    destination: str,
+    days: str,
+    start_date: str,
+    end_date: str,
+    interests: str,
+    weather: str,
+    remain_budget: float,
+    travel_companions: str,
+    transportation: str,
+    travel_style: str,
+    dietary: str,
+    budget_currency: str,
 ) -> str:
     """
-    🗺️ Generate a personalized itinerary with meals, transportation, and sightseeing based on destination, weather, and user preferences.
+    🗺️ Search and generate a personalized itinerary using AI based on user preferences and trip details.
 
-    Instructions:
-    1. Generate a {days}-day itinerary for {destination} based on the following:
-    2. Consider the user's interests: {interests}
-    3. Weather conditions: {weather}
-    4. Budget available: {budget} USD
-    5. Each day should include:
-       - 🍽️ Breakfast, lunch, and dinner (dish names or restaurant suggestions)
-       - 🌟 Two activities (places to visit or things to do)
-       - 🚇 Suggested transport (public, taxi, rental, etc.)
-       - 🌧️ A weather-based tip (e.g., "Bring an umbrella")
+    Args:
+        destination (str): Destination city.
+        days (str): Total days spent
+        start_date (str): Start date in YYYY-MM-DD format.
+        end_date (str): End date in YYYY-MM-DD format.
+        interests (str): User's travel interests (e.g., adventure, culture, food).
+        weather (str): Expected weather conditions.
+        remain_budget (float): Remaining budget for the trip.
+        travel_companions (str): Type of travel companions (Solo, Family, Friends, etc.).
+        transportation (str): Preferred transportation method.
+        travel_style (str): Travel style (e.g., luxury, budget, adventure).
+        dietary (str): Dietary preferences (e.g., vegetarian, gluten-free, etc.).
+        budget_currency (str): Currency for the budget (e.g., USD, EUR).
+
+    Returns:
+        str: A detailed, personalized itinerary generated by the AI response.
     """
-
     try:
-        # The docstring now contains all the instructions for the tool logic.
-        # This is the part where the actual LLM model will be expected to understand and execute the prompt
-        # based on the information provided by the tool's inputs.
+        # Construct the query for generating the itinerary based on inputs
+        query = f"""
+        Generate a {days}-day itinerary for the destination {destination} from {start_date} to {end_date}.
+        Please generate 3 itinerary options for the user to choose from.
+        The user has the following preferences:
+        - Interests: {interests}
+        - Weather: {weather}
+        - Budget: {remain_budget} {budget_currency}
+        - Travel Companions: {travel_companions}
+        - Transportation: {transportation}
+        - Travel Style: {travel_style}
+        - Dietary Preferences: {dietary}
+        
+        For each day, include:
+        1. 🍽️ Breakfast, lunch, and dinner suggestions (dish names or restaurant recommendations)
+        2. 🌟 Two activities (places to visit or things to do)
+        3. 🚇 Suggested transport (e.g., public transport, taxi, rental car)
+        4. 🌧️ Weather tip (e.g., "Bring an umbrella")
 
-        # Generate itinerary based on the description and return the output.
-        # For now, we just return a placeholder response (you can customize it based on your needs).
-        itinerary = f"Here's your {days}-day itinerary for {destination}: \n"
-        itinerary += f"Interests: {interests} \n"
-        itinerary += f"Weather: {weather} \n"
-        itinerary += f"Budget: {budget} USD \n"
-        itinerary += "\nEach day includes:\n"
+        Please ensure the itinerary is well balanced and fits the user's budget and interests.
+        """
 
-        # Example day structure (this can be extended or modified to match your exact needs)
-        for i in range(1, days + 1):
-            itinerary += f"Day {i}: \n"
-            itinerary += "🍽️ Breakfast: [Dish/Restaurant suggestion] \n"
-            itinerary += "🌟 Activity 1: [Place/Activity suggestion] \n"
-            itinerary += "🌟 Activity 2: [Place/Activity suggestion] \n"
-            itinerary += (
-                "🚇 Suggested transport: [Public transport/Taxi/Rental suggestion] \n"
-            )
-            itinerary += "🌧️ Weather tip: [Tip based on the weather] \n"
-
-        return itinerary
+        # Make the call to the AI service (get_response_from_ai_service should be implemented as per your setup)
+        return get_response_from_ai_service(query)
 
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
 
 @tool
-def format_itinerary(itinerary: dict, language: str) -> str:
+def format_itinerary(
+    raw_text: str, destination: str, trip_days: int, language: str
+) -> List[ItineraryPlan]:
     """
-    Formats the given itinerary into a markdown-styled table with days as columns and adds a title based on the language.
-
-    Args:
-        itinerary (dict): A dictionary containing details for each day (meals, activities, transport, weather tips).
-        language (str): The language for the itinerary title.
-
-    Returns:
-        str: A markdown-formatted table with the itinerary and a title.
+    將旅遊摘要文字轉換成三個格式化的行程建議（List[ItineraryPlan]），
+    包含每日活動、時間與花費，輸出結構需完全符合 ItineraryPlan。
     """
-    # Language-based title map
-    title_map = {
-        "en": "🧳 Here is your travel itinerary!",
-        "ja": "🧳 あなたの旅行プランはこちら！",
-        "ko": "🧳 여행 일정이 준비되었습니다!",
-        "zh-tw": "🧳 您的旅遊行程如下！",
-    }
-    title = title_map.get(language, title_map["en"])
+    query = f"""
+    內容必須是 {language}
+    請你根據以下旅遊摘要內容，生成三組格式化的行程建議，每組行程需符合 `ItineraryPlan` 結構。
+    請以 JSON 陣列的形式回傳（List[ItineraryPlan]），並務必符合下列欄位要求：
 
-    # Create the table header with days as columns
-    days = len(itinerary)
-    header = "| Meal | " + " | ".join([f"Day {i+1}" for i in range(days)]) + " |"
-    separator = "|------|" + "|---------|" * days
-
-    # Add data rows
-    meals = (
-        "| Breakfast, Lunch, Dinner | "
-        + " | ".join([itinerary[f"Day {i+1}"]["meal"] for i in range(days)])
-        + " |"
-    )
-    activities1 = (
-        "| Activity 1 | "
-        + " | ".join([itinerary[f"Day {i+1}"]["activity1"] for i in range(days)])
-        + " |"
-    )
-    activities2 = (
-        "| Activity 2 | "
-        + " | ".join([itinerary[f"Day {i+1}"]["activity2"] for i in range(days)])
-        + " |"
-    )
-    transport = (
-        "| Transport | "
-        + " | ".join([itinerary[f"Day {i+1}"]["transport"] for i in range(days)])
-        + " |"
-    )
-    weather = (
-        "| Weather Tip | "
-        + " | ".join([itinerary[f"Day {i+1}"]["weather_tip"] for i in range(days)])
-        + " |"
-    )
-
-    # Constructing the full markdown output
-    table = f"""
-    # {title}
-
-    ```markdown
-    {header}
-    {separator}
-    {meals}
-    {activities1}
-    {activities2}
-    {transport}
-    {weather}
-    ✈️ Safe travels and have fun!
-    ```
+    地點：{destination}
+    行程天數：{trip_days}
+    摘要文字如下：
+    ---
+    {raw_text}
+    ---
+    請確保輸出結構為：
+    [
+    {{
+        "title": str,
+        "highlights": [str, str, ...],
+        "total_cost": int,
+        "avg_per_day": int,
+        "details": [
+        {{
+            "day": int,
+            "schedule": [
+            [str (time), str (activity name)]
+            ]
+        }}
+        ]
+    }},
+    ...
+    ]
     """
 
-    return table
+    try:
+        # Make the call to the AI service (get_response_from_ai_service should be implemented as per your setup)
+        return get_response_from_ai_service(query)
+
+    except Exception as e:
+        return f"❌ Error: {str(e)}"

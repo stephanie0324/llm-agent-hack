@@ -1,5 +1,10 @@
 from langgraph.prebuilt import create_react_agent
-from tools import get_weather, generate_itinerary, format_itinerary
+from tools import (
+    get_weather,
+    search_and_generate_itinerary,
+    format_itinerary,
+    search_flight,
+)
 from config import settings
 
 # Set LLM Model
@@ -7,7 +12,7 @@ model_config = settings.MODEL_CONFIG.root
 
 
 def create_travel_agent():
-    tools = [get_weather, generate_itinerary, format_itinerary]
+    tools = [get_weather, search_and_generate_itinerary, format_itinerary]
 
     # Create the LLM instance
     llm = model_config["AOAI"].as_instance()
