@@ -329,9 +329,9 @@ if st.button(button_text, use_container_width=True):
     }
 
     with st.spinner("🧠 Agent is reasoning..."):
-        thought_block = st.expander("", expanded=True)
         progress_bar = st.progress(0)
-        progress_text = thought_block.empty()
+        progress_text = st.empty()
+        thought_block = st.expander("", expanded=True)
 
         # Initialize counter and list for tool names
         tool_call_count = 0
@@ -464,7 +464,11 @@ if st.session_state.itineraries:
                 #     st.markdown(f"- {spot}")
                 # st.markdown(f"**Estimated Total Cost:** NT$ {plan['total_cost']:,}")
                 # st.markdown(f"**Average Per Day:** NT$ {plan['avg_per_day']:,}")
-                if st.button(f"View Details of {plan['title']}", key=f"view_{idx}"):
+                if st.button(
+                    f"View Details of {plan['title']}",
+                    key=f"view_{idx}",
+                    use_container_width=True,
+                ):
                     st.session_state.selected_plan = idx
                     st.rerun()
     else:
