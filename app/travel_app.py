@@ -1,10 +1,13 @@
+import datetime
 import json
 import re
-import datetime
+import time
+
 import streamlit as st
 from agent import create_travel_agent
+from mock_api import get_mock_itineraries
 
-st.set_page_config(page_title="Travel Buddy", page_icon="💼")
+st.set_page_config(page_title="Travel Buddy", page_icon="💼", layout="wide")
 st.title("💼 Travel Buddy ✈️ - Your Personal Travel Agent")
 
 # ======= set state ==========
@@ -12,6 +15,8 @@ if "itineraries" not in st.session_state:
     st.session_state.itineraries = None
 if "selected_plan" not in st.session_state:
     st.session_state.selected_plan = None
+if "booking_done" not in st.session_state:
+    st.session_state.booking_done = False
 
 # Sidebar Inputs
 with st.sidebar:
@@ -201,59 +206,88 @@ elif language == "日本語":
     button_text = "行程を生成"
 elif language == "한국어":
     button_text = "여행 일정 생성"
+
 # 如果按下按鈕，觸發行程生成
 if st.button(button_text):
     # 呼叫 create_travel_agent 並執行後續邏輯
-    agent = create_travel_agent()
+    # agent = create_travel_agent()
 
-    # 生成的 prompt 和處理流程
-    prompt = f"""
-    Please help plan a personalized itinerary with the following information:
-    
-    Total Days: {days}
-    Destination: {destination}
-    Start Date: {start_date}
-    End Date: {end_date}
-    Budget: {total_budget} {budget_currency}
+    # # 生成的 prompt 和處理流程
+    # prompt = f"""
+    # Please help plan a personalized itinerary with the following information:
 
-    Flight Preferences:
-    - Flight Budget: {flight_budget}
-    - Class: {flight_class}
-    - Preferred Time: {flight_time_pref}
-    - Preferred Airline: {airline_preference or "None"}
-    - Checked Luggage: {'Yes' if with_luggage else 'No'}
-    - Non-Stop Flight: {'Yes' if non_stop else 'No'}
+    # Total Days: {days}
+    # Destination: {destination}
+    # Start Date: {start_date}
+    # End Date: {end_date}
+    # Budget: {total_budget} {budget_currency}
 
-    Hotel Preferences:
-    - Hotel Budget: {hotel_budget}
-    - Stars: {hotel_stars}
-    - Features: {', '.join(hotel_features) if hotel_features else 'None'}
-    - Type: {', '.join(hotel_type) if hotel_type else 'None'}
+    # Flight Preferences:
+    # - Flight Budget: {flight_budget}
+    # - Class: {flight_class}
+    # - Preferred Time: {flight_time_pref}
+    # - Preferred Airline: {airline_preference or "None"}
+    # - Checked Luggage: {'Yes' if with_luggage else 'No'}
+    # - Non-Stop Flight: {'Yes' if non_stop else 'No'}
 
-    Companions: {travel_companions}
-    Transportation Preference: {transportation}
-    Travel Style: {', '.join(travel_style) if travel_style else 'None'}
-    Dietary Requirements: {', '.join(dietary) if dietary else 'None'}
-    Interests: {', '.join(interests) if interests else 'None'}
-    Remaining Budget: {total_budget - (flight_budget + hotel_budget)}
+    # Hotel Preferences:
+    # - Hotel Budget: {hotel_budget}
+    # - Stars: {hotel_stars}
+    # - Features: {', '.join(hotel_features) if hotel_features else 'None'}
+    # - Type: {', '.join(hotel_type) if hotel_type else 'None'}
 
-    Language: {lang_code}
-    You need to use format_itinerary to return the result in json format and only the json format.
-    """
-    response = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
+    # Companions: {travel_companions}
+    # Transportation Preference: {transportation}
+    # Travel Style: {', '.join(travel_style) if travel_style else 'None'}
+    # Dietary Requirements: {', '.join(dietary) if dietary else 'None'}
+    # Interests: {', '.join(interests) if interests else 'None'}
+    # Remaining Budget: {total_budget - (flight_budget + hotel_budget)}
 
-    # 解析回應並儲存
-    raw_content = response["messages"][-1].content
-    cleaned = re.search(r"```json(.*?)```", raw_content, re.DOTALL)
-    itineraries = (
-        json.loads(cleaned.group(1).strip())
-        if cleaned
-        else json.loads(raw_content.strip())
-    )
+    # Language: {lang_code}
+    # You need to use format_itinerary to return the result in json format and only the json format.
+    # """
+    # response = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
 
-    # 儲存生成的計劃
-    st.session_state.itineraries = itineraries
+    # # 解析回應並儲存
+    # raw_content = response["messages"][-1].content
+    # cleaned = re.search(r"```json(.*?)```", raw_content, re.DOTALL)
+    # itineraries = (
+    #     json.loads(cleaned.group(1).strip())
+    #     if cleaned
+    #     else json.loads(raw_content.strip())
+    # )
+
+    # # 儲存生成的計劃
+    # st.session_state.itineraries = itineraries
+    # st.session_state.selected_plan = None
+
+    with st.spinner("🧠 Agent is reasoning..."):
+        thought_block = st.expander("🧠 Agent Thought Process", expanded=True)
+
+        with thought_block:
+            st.write("🤖 Agent: Calling `get_weather` for your destination...")
+            time.sleep(2)
+            st.info("🌤️ Weather in Tokyo: Mostly sunny, 24°C")
+
+            st.write(
+                "🤖 Agent: Calling `search_and_generate_itinerary` with your preferences..."
+            )
+            progress_text = st.empty()
+            for i in range(1, 4):
+                time.sleep(1)
+                progress_text.info(
+                    f"🔍 Found {i} candidate itinerary{'...' if i < 3 else '!'}"
+                )
+            st.success("🗺️ All 3 itineraries generated successfully.")
+
+            st.write("🤖 Agent: Calling `format_itinerary` to organize plan details...")
+            time.sleep(1)
+            st.success("✅ Itinerary formatting complete.")
+
+    # 完成後才儲存到 session_state
+    st.session_state.itineraries = get_mock_itineraries()
     st.session_state.selected_plan = None
+    # st.rerun()
 
 
 if st.session_state.itineraries:
@@ -276,9 +310,19 @@ if st.session_state.itineraries:
         plan = st.session_state.itineraries[st.session_state.selected_plan]
         st.markdown(f"## ✨ Detailed Itinerary: {plan['title']}")
         for day in plan["details"]:
-            st.markdown(f"### Day {day['day']}")
-            for time, item in day["schedule"]:
-                emoji = "⏰"  # Default emoji
+            st.markdown(f"### 📅 Date {day['date']}")
+            schedule_table = {"Time Range": [], "Activity": []}
+
+            schedule = day["schedule"]
+            for i, (start_time, item) in enumerate(schedule):
+                # 決定結束時間（除最後一筆外）
+                if i + 1 < len(schedule):
+                    end_time = schedule[i + 1][0]
+                    time_range = f"{start_time} ~ {end_time}"
+                else:
+                    time_range = f"{start_time} ~ (End)"
+
+                # 配對 emoji
                 if any(
                     keyword in item.lower()
                     for keyword in ["breakfast", "lunch", "dinner"]
@@ -290,9 +334,62 @@ if st.session_state.itineraries:
                     emoji = "🛏️"
                 elif any(keyword in item.lower() for keyword in ["airport", "flight"]):
                     emoji = "✈️"
-                st.markdown(f"- {emoji} {time} → {item}")
+                elif any(
+                    keyword in item.lower()
+                    for keyword in ["museum", "temple", "shrine", "art", "tour"]
+                ):
+                    emoji = "🏛️"
+                elif any(keyword in item.lower() for keyword in ["shopping", "market"]):
+                    emoji = "💼️"
+                elif any(
+                    keyword in item.lower() for keyword in ["onsen", "relax", "spa"]
+                ):
+                    emoji = "♨️"
+                else:
+                    emoji = "⏰"
+
+                schedule_table["Time Range"].append(time_range)
+                schedule_table["Activity"].append(f"{emoji} {item}")
+
+            st.table(schedule_table)
+
         st.markdown(f"\n**Total Cost:** NT$ {plan['total_cost']:,}")
         st.markdown(f"**Avg/Day:** NT$ {plan['avg_per_day']:,}")
+        st.markdown("---")
+
+        st.markdown(
+            "🔽 Click the button below to automatically book the following items:"
+        )
+        st.markdown(
+            """
+        - 🛫 Flights (based on your preferred time and airline)
+        - 🏨 Hotels (with breakfast / near train stations)
+        - 🚖 Airport transfers and local transportation passes
+        - 🎟️ Attraction tickets (if included in the itinerary)
+        """
+        )
+
+        if not st.session_state.booking_done:
+            if st.button("✅ Book All (Flights, Hotels, Transport)"):
+                with st.spinner("⏳ Booking in progress... Please wait a moment."):
+                    time.sleep(5)  # 模擬API請求等待時間
+                st.success(
+                    "🎉 Booking confirmed! All items have been successfully arranged."
+                )
+                st.session_state.booking_done = True
+                st.rerun()
+        else:
+            if st.button("💳 Proceed to Payment"):
+                # Simulated payment flow
+                st.markdown("Please click the link below to complete your payment:")
+                st.markdown(
+                    "[🔗 Go to Payment Page](https://mockpayment.example.com/pay?plan_id=1234)",
+                    unsafe_allow_html=True,
+                )
+                st.info(
+                    "💡 You will receive an email confirmation once payment is complete."
+                )
+
         if st.button("🔙 Back to all plans"):
             st.session_state.selected_plan = None
             st.rerun()
