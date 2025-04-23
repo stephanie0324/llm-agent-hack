@@ -1,48 +1,18 @@
 from langchain.tools import tool
 from typing import TypedDict, Optional, List
 from datetime import datetime, timedelta
-from pydantic import BaseModel, Field
 import requests
 import urllib3
 
 from config import settings
 from utils import get_response_from_ai_service
+from schemas.schema import ItineraryPlan
 
 # Suppress SSL warnings if needed
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Set LLM Model
 model_config = settings.MODEL_CONFIG.root
-
-
-# === Schemas ===
-class FormatInput(TypedDict):
-    itinerary: str
-    language: str
-
-
-class ScheduleItem(BaseModel):
-    time: str = Field(..., description="活動開始的時間，例如 '08:00'")
-    activity: str = Field(..., description="活動內容，例如 'Visit Asakusa Temple'")
-    cost: int = Field(..., description="此活動的花費（單位：日幣）")
-
-
-class DaySchedule(BaseModel):
-    day: int = Field(..., description="第幾天的行程")
-    schedule: List[ScheduleItem] = Field(..., description="此天的詳細行程表")
-
-
-class ItineraryPlan(BaseModel):
-    title: str = Field(..., description="行程標題，簡短描述此行程主題")
-    highlights: List[str] = Field(..., description="從整個行程中擷取出來的三個亮點活動")
-    total_cost: int = Field(..., description="整趟行程的總費用（日幣）")
-    avg_per_day: float = Field(..., description="平均每日費用（日幣）")
-    details: List[DaySchedule] = Field(..., description="完整的每日行程安排")
-
-
-# ==========================================================
-# TOOLS
-# ==========================================================
 
 
 @tool
@@ -135,6 +105,47 @@ def search_flight(
 
 
 @tool
+def search_hotel(
+    destination: str,
+    check_in_date: str,
+    check_out_date: str,
+    hotel_budget: float,
+    hotel_rating: float,
+    hotel_type: str,
+    amenities: str,
+):
+    """
+    🏨 Search for hotels based on user preferences, ensuring at least 10 hotel options within the budget.
+
+    Args:
+        destination (str): Destination city.
+        check_in_date (str): Check-in date in YYYY-MM-DD format.
+        check_out_date (str): Check-out date in YYYY-MM-DD format.
+        hotel_budget (float): Maximum budget for the hotel stay.
+        hotel_rating (float): Minimum star rating for the hotel.
+        hotel_type (str): Type of hotel (e.g., luxury, budget, boutique).
+        amenities (str): Desired amenities (e.g., pool, gym, breakfast).
+
+    Returns:
+        str: Hotel search results with at least 10 options within budget.
+    """
+    try:
+        query = f"""
+        Search for hotels in {destination} from {check_in_date} to {check_out_date}.
+        The user has a budget of ${hotel_budget}. 
+        Minimum star rating: {hotel_rating}.
+        Hotel type preference: {hotel_type}.
+        Desired amenities: {amenities}.
+        Please return at least 10 hotel options that fall within the budget, including details such as pricing, 
+        location, and amenities.
+        """
+        return get_response_from_ai_service(query)
+
+    except requests.exceptions.RequestException as e:
+        return f"❌ Error: Unable to retrieve hotel data for {destination}. {str(e)}"
+
+
+@tool
 def search_and_generate_itinerary(
     destination: str,
     days: str,
@@ -204,33 +215,59 @@ def format_itinerary(
     raw_text: str, destination: str, trip_days: int, language: str
 ) -> List[ItineraryPlan]:
     """
-    將旅遊摘要文字轉換成三個格式化的行程建議（List[ItineraryPlan]），
-    包含每日活動、時間與花費，輸出結構需完全符合 ItineraryPlan。
+    Converts the raw travel summary text into three formatted itinerary suggestions (List[ItineraryPlan]),
+    including daily activities, time, and cost. The output structure must strictly follow the ItineraryPlan format.
     """
     query = f"""
-    內容必須是 {language}
-    請你根據以下旅遊摘要內容，生成三組格式化的行程建議，每組行程需符合 `ItineraryPlan` 結構。
-    請以 JSON 陣列的形式回傳（List[ItineraryPlan]），並務必符合下列欄位要求：
+    The content must be in {language}.
+    Based on the following travel summary, generate three formatted itinerary suggestions. Each itinerary must follow the `ItineraryPlan` structure.
+    The output should be in a JSON array format (List[ItineraryPlan]) and must include the following fields:
+    When you generate title, please make it short and catchy.
 
-    地點：{destination}
-    行程天數：{trip_days}
-    摘要文字如下：
+    Location: {destination}
+    Trip duration: {trip_days} days
+    Summary text as follows:
     ---
     {raw_text}
     ---
-    請確保輸出結構為：
+    Please ensure the output structure is as follows:
     [
     {{
         "title": str,
         "highlights": [str, str, ...],
         "total_cost": int,
         "avg_per_day": int,
+        "hotels": [
+            {{
+                "name": str,
+                "price": int,
+                "rating": float,
+                "start_date": str,
+                "end_date": str
+            }},
+            ...
+        ],
+        "flights": [
+            {{
+                "start_date": str,
+                "from": str,
+                "to": str,
+                "airline": str,
+                "class": str,
+                "check-in luggage": bool,
+                "price": int
+            }},
+            ...
+        ],
         "details": [
         {{
-            "day": int,
+            "date": str,
             "schedule": [
             [str (time), str (activity name)]
-            ]
+            ],
+            "hotel": {{
+                "name": str
+            }}
         }}
         ]
     }},

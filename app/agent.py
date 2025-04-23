@@ -4,6 +4,7 @@ from tools import (
     search_and_generate_itinerary,
     format_itinerary,
     search_flight,
+    search_hotel,
 )
 from config import settings
 
@@ -12,7 +13,13 @@ model_config = settings.MODEL_CONFIG.root
 
 
 def create_travel_agent():
-    tools = [get_weather, search_and_generate_itinerary, format_itinerary]
+    tools = [
+        get_weather,
+        search_flight,
+        search_hotel,
+        search_and_generate_itinerary,
+        format_itinerary,
+    ]
 
     # Create the LLM instance
     llm = model_config["AOAI"].as_instance()

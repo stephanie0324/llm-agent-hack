@@ -46,6 +46,26 @@ def get_mock_itineraries() -> List[ItineraryPlan]:
                     "end_date": "2025/05/03",
                 },
             ],
+            "flights": [
+                {
+                    "start_date": "2025/05/01",
+                    "from": "Taipei",
+                    "to": "Tokyo",
+                    "airline": "All Nippon Airways",
+                    "class": "Economy",
+                    "check-in luggage": False,
+                    "price": 2000,
+                },
+                {
+                    "start_date": "2025/05/03",
+                    "from": "Tokyo",
+                    "to": "Taipei",
+                    "airline": "All Nippon Airways",
+                    "class": "Economy",
+                    "check-in luggage": True,
+                    "price": 2000,
+                },
+            ],
             "details": [
                 {
                     "date": "2025/05/01",
@@ -108,6 +128,26 @@ def get_mock_itineraries() -> List[ItineraryPlan]:
                     "end_date": "2025/05/03",
                 },
             ],
+            "flights": [
+                {
+                    "start_date": "2025/05/01",
+                    "from": "Taipei",
+                    "to": "Tokyo",
+                    "airline": "All Nippon Airways",
+                    "class": "Economy",
+                    "check-in luggage": False,
+                    "price": 2000,
+                },
+                {
+                    "start_date": "2025/05/03",
+                    "from": "Tokyo",
+                    "to": "Taipei",
+                    "airline": "All Nippon Airways",
+                    "class": "Economy",
+                    "check-in luggage": False,
+                    "price": 2000,
+                },
+            ],
             "details": [
                 {
                     "date": "2025/05/01",
@@ -168,6 +208,26 @@ def get_mock_itineraries() -> List[ItineraryPlan]:
                     "rating": 4.9,
                     "start_date": "2025/05/02",
                     "end_date": "2025/05/03",
+                },
+            ],
+            "flights": [
+                {
+                    "start_date": "2025/05/01",
+                    "from": "Taipei",
+                    "to": "Tokyo",
+                    "airline": "All Nippon Airways",
+                    "class": "Economy",
+                    "check-in luggage": False,
+                    "price": 2000,
+                },
+                {
+                    "start_date": "2025/05/03",
+                    "from": "Tokyo",
+                    "to": "Taipei",
+                    "airline": "All Nippon Airways",
+                    "class": "Economy",
+                    "check-in luggage": False,
+                    "price": 2000,
                 },
             ],
             "details": [

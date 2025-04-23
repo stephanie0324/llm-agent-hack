@@ -7,8 +7,78 @@ import streamlit as st
 from agent import create_travel_agent
 from mock_api import get_mock_itineraries
 
-st.set_page_config(page_title="Travel Buddy", page_icon="💼", layout="wide")
-st.title("💼 Travel Buddy ✈️ - Your Personal Travel Agent")
+st.set_page_config(page_title="Travel Buddy", page_icon="✈️", layout="wide")
+background_image_url = "https://c1.wallpaperflare.com/preview/447/58/538/cloudscape-texture-cloud-sky-thumbnail.jpg"
+st.markdown(
+    f"""
+    <style>
+    .header-container {{
+        text-align: center;
+        background: url({background_image_url}) no-repeat center center fixed; /* Background image */
+        background-size: cover; /* Make the background cover the entire container */
+        padding: 40px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }}
+    .header {{
+        font-size: 60px;
+        color: #ffffff;
+        font-family: 'Times New Roman', serif;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+    }}
+    .subheader {{
+        font-size: 24px;
+        color: #ffffff;
+        font-family: 'Arial', sans-serif;
+        font-weight: 400;
+        letter-spacing: 1px;
+        font-style: italic;
+    }}
+    .divider {{
+        border: 0;
+        border-top: 3px solid #00BFFF;
+        width: 60%;
+        margin: 30px auto;
+        opacity: 0.6;
+    }}
+    .footer {{
+        text-align: center;
+        font-size: 18px;
+        font-family: 'Arial', sans-serif;
+        margin-top: 40px;
+        letter-spacing: 1px;
+    }}
+    .footer a.streamlit {{
+        color: #FF4500;  /* Orange Red for Streamlit */
+        text-decoration: none;
+        font-weight: bold;
+    }}
+    .footer a.azure {{
+        color: #1E90FF;  /* Dodger Blue for Azure */
+        text-decoration: none;
+        font-weight: bold;
+    }}
+    </style>
+    <div class="header-container">
+        <div class="header">
+            ✈️ Travel Buddy
+        </div>
+        <div class="subheader">
+            Your go-to travel assistant for the perfect vacation 🏖️
+        </div>
+    </div>
+    <div class="divider"></div>
+    <div class="footer">
+        Powered by <a href="https://www.streamlit.io" target="_blank" class="streamlit">Streamlit</a> & <a href="https://azure.microsoft.com" target="_blank" class="azure">Azure</a> ✨
+    </div>
+""",
+    unsafe_allow_html=True,
+)
+
+
+# st.title("✈️ Travel Buddy")
 
 # ======= set state ==========
 if "itineraries" not in st.session_state:
@@ -34,24 +104,25 @@ with st.sidebar:
         st.header("📍 Destination & Dates")
         col1, col2 = st.columns(2)
         with col1:
-            destination = st.text_input("Destination", "Tokyo")
+            departure = st.text_input("Departure", "Taipei")
         with col2:
-            date_range = st.date_input(
-                "🗓️ Travel Dates (Start - End)",
-                [
-                    datetime.date.today(),
-                    datetime.date.today() + datetime.timedelta(days=3),
-                ],
-            )
-            if len(date_range) != 2:
-                st.error("Please select both a start and an end date.")
+            destination = st.text_input("Destination", "Tokyo")
+        date_range = st.date_input(
+            "🗓️ Travel Dates (Start - End)",
+            [
+                datetime.date.today(),
+                datetime.date.today() + datetime.timedelta(days=3),
+            ],
+        )
+        if len(date_range) != 2:
+            st.error("Please select both a start and an end date.")
+        else:
+            start_date, end_date = date_range
+            if end_date < start_date:
+                st.error("End date cannot be earlier than the start date.")
+                days = 0
             else:
-                start_date, end_date = date_range
-                if end_date < start_date:
-                    st.error("End date cannot be earlier than the start date.")
-                    days = 0
-                else:
-                    days = (end_date - start_date).days
+                days = (end_date - start_date).days
 
     with st.container(border=True):
         st.header("💰 Budget")
@@ -208,85 +279,142 @@ elif language == "한국어":
     button_text = "여행 일정 생성"
 
 # 如果按下按鈕，觸發行程生成
-if st.button(button_text):
+if st.button(button_text, use_container_width=True):
     # 呼叫 create_travel_agent 並執行後續邏輯
-    # agent = create_travel_agent()
+    agent = create_travel_agent()
 
-    # # 生成的 prompt 和處理流程
-    # prompt = f"""
-    # Please help plan a personalized itinerary with the following information:
+    # 生成的 prompt 和處理流程
+    prompt = f"""
+    Please help plan 3 personalized itinerary for the user to choose with the following information:
+    Consider the below details, budget and weather.
 
-    # Total Days: {days}
-    # Destination: {destination}
-    # Start Date: {start_date}
-    # End Date: {end_date}
-    # Budget: {total_budget} {budget_currency}
+    Departure: {departure}
+    Destination: {destination}
+    Total Days: {days}
+    Start Date: {start_date}
+    End Date: {end_date}
+    Budget: {total_budget} {budget_currency}
 
-    # Flight Preferences:
-    # - Flight Budget: {flight_budget}
-    # - Class: {flight_class}
-    # - Preferred Time: {flight_time_pref}
-    # - Preferred Airline: {airline_preference or "None"}
-    # - Checked Luggage: {'Yes' if with_luggage else 'No'}
-    # - Non-Stop Flight: {'Yes' if non_stop else 'No'}
+    Flight Preferences:
+    - Flight Budget: {flight_budget}
+    - Class: {flight_class}
+    - Preferred Time: {flight_time_pref}
+    - Preferred Airline: {airline_preference or "None"}
+    - Checked Luggage: {'Yes' if with_luggage else 'No'}
+    - Non-Stop Flight: {'Yes' if non_stop else 'No'}
 
-    # Hotel Preferences:
-    # - Hotel Budget: {hotel_budget}
-    # - Stars: {hotel_stars}
-    # - Features: {', '.join(hotel_features) if hotel_features else 'None'}
-    # - Type: {', '.join(hotel_type) if hotel_type else 'None'}
+    Hotel Preferences:
+    - Hotel Budget: {hotel_budget}
+    - Stars: {hotel_stars}
+    - Features: {', '.join(hotel_features) if hotel_features else 'None'}
+    - Type: {', '.join(hotel_type) if hotel_type else 'None'}
 
-    # Companions: {travel_companions}
-    # Transportation Preference: {transportation}
-    # Travel Style: {', '.join(travel_style) if travel_style else 'None'}
-    # Dietary Requirements: {', '.join(dietary) if dietary else 'None'}
-    # Interests: {', '.join(interests) if interests else 'None'}
-    # Remaining Budget: {total_budget - (flight_budget + hotel_budget)}
+    Companions: {travel_companions}
+    Transportation Preference: {transportation}
+    Travel Style: {', '.join(travel_style) if travel_style else 'None'}
+    Dietary Requirements: {', '.join(dietary) if dietary else 'None'}
+    Interests: {', '.join(interests) if interests else 'None'}
+    Remaining Budget: {total_budget - (flight_budget + hotel_budget)}
 
-    # Language: {lang_code}
-    # You need to use format_itinerary to return the result in json format and only the json format.
-    # """
-    # response = agent.invoke({"messages": [{"role": "user", "content": prompt}]})
+    Language: {lang_code}
+    You need to use `format_itinerary` to return the result in json format and only the json format.
+    """
 
-    # # 解析回應並儲存
-    # raw_content = response["messages"][-1].content
-    # cleaned = re.search(r"```json(.*?)```", raw_content, re.DOTALL)
-    # itineraries = (
-    #     json.loads(cleaned.group(1).strip())
-    #     if cleaned
-    #     else json.loads(raw_content.strip())
-    # )
-
-    # # 儲存生成的計劃
-    # st.session_state.itineraries = itineraries
-    # st.session_state.selected_plan = None
+    emoji_map = {
+        "search_flight": "✈️",
+        "search_hotel": "🏨",
+        "get_weather": "⛅️",
+        "search_and_generate_itinerary": "🗺️",
+        "format_itinerary": "📋",
+    }
 
     with st.spinner("🧠 Agent is reasoning..."):
-        thought_block = st.expander("🧠 Agent Thought Process", expanded=True)
+        thought_block = st.expander("", expanded=True)
+        progress_bar = st.progress(0)
+        progress_text = thought_block.empty()
 
+        # Initialize counter and list for tool names
+        tool_call_count = 0
+        function_names = []  # List to store all function names
+
+        # Dynamically collect tool calls and display detailed output
         with thought_block:
-            st.write("🤖 Agent: Calling `get_weather` for your destination...")
-            time.sleep(2)
-            st.info("🌤️ Weather in Tokyo: Mostly sunny, 24°C")
+            for event in agent.stream(
+                {"messages": [{"role": "user", "content": prompt}]}
+            ):
+                if "agent" in event:
+                    for message in event["agent"]["messages"]:
+                        # Check if message contains tool calls
+                        if hasattr(message, "additional_kwargs"):
+                            tool_calls = getattr(message, "additional_kwargs", {}).get(
+                                "tool_calls", []
+                            )
 
-            st.write(
-                "🤖 Agent: Calling `search_and_generate_itinerary` with your preferences..."
-            )
-            progress_text = st.empty()
-            for i in range(1, 4):
-                time.sleep(1)
-                progress_text.info(
-                    f"🔍 Found {i} candidate itinerary{'...' if i < 3 else '!'}"
-                )
-            st.success("🗺️ All 3 itineraries generated successfully.")
+                            for tool_call in tool_calls:
+                                tool_name = tool_call["function"]["name"]
+                                tool_args = tool_call["function"]["arguments"]
+                                emoji = emoji_map.get(tool_name, "🔧")
 
-            st.write("🤖 Agent: Calling `format_itinerary` to organize plan details...")
-            time.sleep(1)
-            st.success("✅ Itinerary formatting complete.")
+                                with st.chat_message("assistant"):
+                                    st.markdown(f"{emoji} **Calling `{tool_name}`**")
+                                    st.code(tool_args, language="json")
 
-    # 完成後才儲存到 session_state
-    st.session_state.itineraries = get_mock_itineraries()
+                                # Update progress bar dynamically
+                                tool_call_count += 1
+                                progress = min(
+                                    tool_call_count / (tool_call_count + 1), 1.0
+                                )  # Dynamic counting for progress bar
+                                progress_bar.progress(progress)
+
+                        # If it is the final result, display the final output
+                        if hasattr(message, "content") and message.content:
+                            raw_content = message.content
+                            progress_bar.progress(1.0)  # Complete
+                            progress_text.text("✅ Process complete! 🎉")
+                            break  # Break the loop after getting the final result
+
+    cleaned = re.search(r"```json(.*?)```", raw_content, re.DOTALL)
+    itineraries = (
+        json.loads(cleaned.group(1).strip())
+        if cleaned
+        else json.loads(raw_content.strip())
+    )
+
+    # # 顯示結果
+    # st.subheader("📝 Final Itinerary")
+    # st.json(itineraries)
+    # st.write(itineraries)
+
+    # # 儲存生成的計劃
+    st.session_state.itineraries = itineraries
     st.session_state.selected_plan = None
+
+    # with st.spinner("🧠 Agent is reasoning..."):
+    #     thought_block = st.expander("🧠 Agent Thought Process", expanded=True)
+
+    #     with thought_block:
+    #         st.write("🤖 Agent: Calling `get_weather` for your destination...")
+    #         time.sleep(2)
+    #         st.info("🌤️ Weather in Tokyo: Mostly sunny, 24°C")
+
+    #         st.write(
+    #             "🤖 Agent: Calling `search_and_generate_itinerary` with your preferences..."
+    #         )
+    #         progress_text = st.empty()
+    #         for i in range(1, 4):
+    #             time.sleep(1)
+    #             progress_text.info(
+    #                 f"🔍 Found {i} candidate itinerary{'...' if i < 3 else '!'}"
+    #             )
+    #         st.success("🗺️ All 3 itineraries generated successfully.")
+
+    #         st.write("🤖 Agent: Calling `format_itinerary` to organize plan details...")
+    #         time.sleep(1)
+    #         st.success("✅ Itinerary formatting complete.")
+
+    # # 完成後才儲存到 session_state
+    # st.session_state.itineraries = get_mock_itineraries()
+    # st.session_state.selected_plan = None
     # st.rerun()
 
 
@@ -296,12 +424,46 @@ if st.session_state.itineraries:
         cols = st.columns(len(st.session_state.itineraries))
         for idx, plan in enumerate(st.session_state.itineraries):
             with cols[idx]:
-                st.markdown(f"### ✨ {plan['title']}")
-                st.markdown("**Trip Highlights:**")
-                for spot in plan["highlights"]:
-                    st.markdown(f"- {spot}")
-                st.markdown(f"**Estimated Total Cost:** NT$ {plan['total_cost']:,}")
-                st.markdown(f"**Average Per Day:** NT$ {plan['avg_per_day']:,}")
+                st.markdown(
+                    f"""
+                    <div style="
+                        border: 2px solid #1E90FF;
+                        border-radius: 30px;
+                        padding: 30px 25px;
+                        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+                        margin: 10px auto;
+                        width: 100%;
+                        min-height: 250px;
+                        box-sizing: border-box;
+                        background-color: #ffffff;
+                        text-align: left;
+                    ">
+                        <h3 style="color: #1E90FF; font-size: 22px; margin-bottom: 20px; text-align: center;">
+                            ✨ {plan['title']}
+                        </h3>
+                        <p style="text-align: left; font-size: 16px; font-weight: bold; margin-bottom: 10px;">
+                            Trip Highlights:
+                        </p>
+                        <ul style="text-align: left; font-size: 14px; list-style-type: disc; margin-left: 25px; line-height: 1.6;">
+                            {"".join([f"<li>{spot}</li>" for spot in plan['highlights']])}
+                        </ul>
+                        <p style="text-align: left; font-size: 16px; margin-top: 20px;">
+                            <strong>Estimated Total Cost:</strong> NT$ {plan['total_cost']:,}
+                        </p>
+                        <p style="text-align: left; font-size: 16px;">
+                            <strong>Average Per Day:</strong> NT$ {plan['avg_per_day']:,}
+                        </p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # st.markdown(f"### ✨ {plan['title']}")
+                # st.markdown("**Trip Highlights:**")
+                # for spot in plan["highlights"]:
+                #     st.markdown(f"- {spot}")
+                # st.markdown(f"**Estimated Total Cost:** NT$ {plan['total_cost']:,}")
+                # st.markdown(f"**Average Per Day:** NT$ {plan['avg_per_day']:,}")
                 if st.button(f"View Details of {plan['title']}", key=f"view_{idx}"):
                     st.session_state.selected_plan = idx
                     st.rerun()
