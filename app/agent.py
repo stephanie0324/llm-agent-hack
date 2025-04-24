@@ -1,15 +1,19 @@
+from config import settings
 from langgraph.prebuilt import create_react_agent
 from tools import (
-    get_weather,
-    search_and_generate_itinerary,
     format_itinerary,
+    get_weather,
+    modify_itinerary,
+    search_and_generate_itinerary,
     search_flight,
     search_hotel,
 )
-from config import settings
 
 # Set LLM Model
 model_config = settings.MODEL_CONFIG.root
+
+# Create the LLM instance
+llm = model_config["AOAI"].as_instance()
 
 
 def create_travel_agent():
@@ -21,8 +25,26 @@ def create_travel_agent():
         format_itinerary,
     ]
 
-    # Create the LLM instance
-    llm = model_config["AOAI"].as_instance()
+    # Bind the tools to the LLM
+    llm_with_tools = llm.bind_tools(tools)
+
+    # Create the agent with both model and tools
+    agent = create_react_agent(model=llm_with_tools, tools=tools, debug=settings.DEBUG)
+
+    return agent
+
+
+def create_modify_itinerary_agent():
+    """Create an agent specifically for modifying existing itineraries.
+
+    Returns:
+        Agent: A ReAct agent with tools for modifying itineraries
+    """
+    tools = [
+        modify_itinerary,
+        search_and_generate_itinerary,
+        format_itinerary,
+    ]
 
     # Bind the tools to the LLM
     llm_with_tools = llm.bind_tools(tools)

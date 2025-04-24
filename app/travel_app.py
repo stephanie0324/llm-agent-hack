@@ -2,190 +2,495 @@ import datetime
 import json
 import re
 import time
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 import streamlit as st
-from agent import create_travel_agent
-from mock_api import get_mock_itineraries
-
-st.set_page_config(page_title="Travel Buddy", page_icon="✈️", layout="wide")
-background_image_url = "https://c1.wallpaperflare.com/preview/447/58/538/cloudscape-texture-cloud-sky-thumbnail.jpg"
-st.markdown(
-    f"""
-    <style>
-    .header-container {{
-        text-align: center;
-        background: url({background_image_url}) no-repeat center center fixed; /* Background image */
-        background-size: cover; /* Make the background cover the entire container */
-        padding: 40px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    }}
-    .header {{
-        font-size: 60px;
-        color: #ffffff;
-        font-family: 'Times New Roman', serif;
-        font-weight: bold;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        margin-bottom: 10px;
-    }}
-    .subheader {{
-        font-size: 24px;
-        color: #ffffff;
-        font-family: 'Arial', sans-serif;
-        font-weight: 400;
-        letter-spacing: 1px;
-        font-style: italic;
-    }}
-    .divider {{
-        border: 0;
-        border-top: 3px solid #00BFFF;
-        width: 60%;
-        margin: 30px auto;
-        opacity: 0.6;
-    }}
-    .footer {{
-        text-align: center;
-        font-size: 18px;
-        font-family: 'Arial', sans-serif;
-        margin-top: 40px;
-        letter-spacing: 1px;
-    }}
-    .footer a.streamlit {{
-        color: #FF4500;  /* Orange Red for Streamlit */
-        text-decoration: none;
-        font-weight: bold;
-    }}
-    .footer a.azure {{
-        color: #1E90FF;  /* Dodger Blue for Azure */
-        text-decoration: none;
-        font-weight: bold;
-    }}
-    </style>
-    <div class="header-container">
-        <div class="header">
-            ✈️ Travel Buddy
-        </div>
-        <div class="subheader">
-            Your go-to travel assistant for the perfect vacation 🏖️
-        </div>
-    </div>
-    <div class="divider"></div>
-    <div class="footer">
-        Powered by <a href="https://www.streamlit.io" target="_blank" class="streamlit">Streamlit</a> & <a href="https://azure.microsoft.com" target="_blank" class="azure">Azure</a> ✨
-    </div>
-""",
-    unsafe_allow_html=True,
-)
+from agent import create_modify_itinerary_agent, create_travel_agent
+from mock_api import get_mock_itineraries, get_mock_modified_itinerary
 
 
-# st.title("✈️ Travel Buddy")
+@dataclass
+class TravelPreferences:
+    language: str
+    travel_style: List[str]
+    interests: List[str]
+    transportation: str
+    dietary: List[str]
 
-# ======= set state ==========
-if "itineraries" not in st.session_state:
-    st.session_state.itineraries = None
-if "selected_plan" not in st.session_state:
-    st.session_state.selected_plan = None
-if "booking_done" not in st.session_state:
-    st.session_state.booking_done = False
 
-# Sidebar Inputs
-with st.sidebar:
-    with st.container(border=True):
-        st.header("⚙️ Settings")
-        language = st.selectbox("Language", ["English", "日本語", "한국어", "繁體中文"])
-        lang_code = {
-            "English": "en",
-            "日本語": "ja",
-            "한국어": "ko",
-            "繁體中文": "zh-tw",
-        }[language]
+@dataclass
+class FlightPreferences:
+    budget: float
+    flight_class: str
+    time_preference: str
+    airline: Optional[str]
+    with_luggage: bool
+    non_stop: bool
 
-    with st.container(border=True):
-        st.header("📍 Destination & Dates")
-        col1, col2 = st.columns(2)
-        with col1:
-            departure = st.text_input("Departure", "Taipei")
-        with col2:
-            destination = st.text_input("Destination", "Tokyo")
-        date_range = st.date_input(
-            "🗓️ Travel Dates (Start - End)",
-            [
-                datetime.date.today(),
-                datetime.date.today() + datetime.timedelta(days=3),
-            ],
+
+@dataclass
+class HotelPreferences:
+    budget: float
+    stars: str
+    features: List[str]
+    types: List[str]
+
+
+@dataclass
+class TravelConfig:
+    departure: str
+    destination: str
+    start_date: datetime.date
+    end_date: datetime.date
+    total_budget: float
+    currency: str
+    flight_prefs: FlightPreferences
+    hotel_prefs: HotelPreferences
+    travel_prefs: TravelPreferences
+
+    @property
+    def days(self) -> int:
+        return (self.end_date - self.start_date).days
+
+
+@dataclass
+class ItineraryModification:
+    timestamp: datetime.datetime
+    original_activities: List[Dict]
+    modified_activities: List[Dict]
+    instruction: str
+
+
+@dataclass
+class ChatMessage:
+    role: str
+    content: str
+    timestamp: datetime.datetime
+
+
+class ChatHistory:
+    def __init__(self):
+        if "chat_messages" not in st.session_state:
+            st.session_state.chat_messages = []
+
+    def add_message(self, role: str, content: str):
+        """Add a new message to the chat history"""
+        message = ChatMessage(
+            role=role, content=content, timestamp=datetime.datetime.now()
         )
-        if len(date_range) != 2:
-            st.error("Please select both a start and an end date.")
-        else:
-            start_date, end_date = date_range
-            if end_date < start_date:
-                st.error("End date cannot be earlier than the start date.")
-                days = 0
-            else:
-                days = (end_date - start_date).days
+        st.session_state.chat_messages.append(message)
 
-    with st.container(border=True):
-        st.header("💰 Budget")
+    def get_messages(self) -> List[ChatMessage]:
+        """Get all messages in the chat history"""
+        return st.session_state.chat_messages
 
-        st.markdown("#### 🔢 Allocate Your Budget")
+    def clear(self):
+        """Clear the chat history"""
+        st.session_state.chat_messages = []
 
-        col1, col2 = st.columns(2)
-        with col1:
-            flight_budget = st.number_input(
-                "Flight Budget", min_value=0, value=10000, step=500
-            )
-        with col2:
-            hotel_budget = st.number_input(
-                "Hotel Budget", min_value=0, value=15000, step=500
-            )
 
-        # 計算最小總預算
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            min_total_budget = flight_budget + hotel_budget
+class ItineraryHistory:
+    def __init__(self):
+        self.modifications = []
 
-            total_budget = st.slider(
-                "Total Budget",
-                min_value=min_total_budget,
-                max_value=100000,
-                value=max(min_total_budget, 30000),  # 預設值不能比 min 小
-                step=1000,
-            )
-        with col2:
-            budget_currency = st.selectbox(
-                "Currency", ["USD", "EUR", "JPY", "GBP", "AUD", "TWD"]
-            )
+    def add_modification(self, mod: ItineraryModification):
+        self.modifications.append(mod)
 
-        st.success(
-            f"✅ Remaining Budget: {total_budget - (flight_budget + hotel_budget)}"
+    def get_latest_modification(self) -> Optional[ItineraryModification]:
+        return self.modifications[-1] if self.modifications else None
+
+    def clear(self):
+        self.modifications = []
+
+
+class ItineraryPlanner:
+    def __init__(self, config: TravelConfig):
+        self.config = config
+        self.agent = create_travel_agent()
+
+    def generate_prompt(self) -> str:
+        return f"""
+        Please help plan 3 personalized itinerary for the user to choose with the following information:
+        Consider the below details, budget and weather.
+
+        Departure: {self.config.departure}
+        Destination: {self.config.destination}
+        Total Days: {self.config.days}
+        Start Date: {self.config.start_date}
+        End Date: {self.config.end_date}
+        Budget: {self.config.total_budget} {self.config.currency}
+
+        Flight Preferences:
+        - Flight Budget: {self.config.flight_prefs.budget}
+        - Class: {self.config.flight_prefs.flight_class}
+        - Preferred Time: {self.config.flight_prefs.time_preference}
+        - Preferred Airline: {self.config.flight_prefs.airline or "None"}
+        - Checked Luggage: {'Yes' if self.config.flight_prefs.with_luggage else 'No'}
+        - Non-Stop Flight: {'Yes' if self.config.flight_prefs.non_stop else 'No'}
+
+        Hotel Preferences:
+        - Hotel Budget: {self.config.hotel_prefs.budget}
+        - Stars: {self.config.hotel_prefs.stars}
+        - Features: {', '.join(self.config.hotel_prefs.features) if self.config.hotel_prefs.features else 'None'}
+        - Type: {', '.join(self.config.hotel_prefs.types) if self.config.hotel_prefs.types else 'None'}
+
+        Language: {self.config.travel_prefs.language}
+        """
+
+    def generate_itineraries(self):
+        prompt = self.generate_prompt()
+        # Implementation here...
+        return get_mock_itineraries()  # 暫時使用 mock 資料
+
+
+class TravelUI:
+    def __init__(self):
+        self.config = None
+        self.planner = None
+        self._language = "English"
+        self.history = ItineraryHistory()
+        self.chat_history = ChatHistory()
+
+    def setup_page(self):
+        st.set_page_config(page_title="Travel Buddy", page_icon="✈️", layout="wide")
+        self._setup_styles()
+
+    def _setup_styles(self):
+        background_image_url = "https://c1.wallpaperflare.com/preview/447/58/538/cloudscape-texture-cloud-sky-thumbnail.jpg"
+        st.markdown(
+            f"""
+            <style>
+            .header-container {{
+                text-align: center;
+                        background: url({background_image_url}) no-repeat center center fixed;
+                        background-size: cover;
+                padding: 40px;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            }}
+            .header {{
+                font-size: 60px;
+                color: #ffffff;
+                font-family: 'Times New Roman', serif;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 2px;
+                margin-bottom: 10px;
+            }}
+            .subheader {{
+                font-size: 24px;
+                color: #ffffff;
+                font-family: 'Arial', sans-serif;
+                font-weight: 400;
+                letter-spacing: 1px;
+                font-style: italic;
+            }}
+            .footer {{
+                position: fixed;
+                left: 0;
+                bottom: 0;
+                width: 100%;
+                text-align: center;
+                padding: 20px;
+                background-color: white;
+                box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+                z-index: 1000;
+            }}
+            .footer .divider {{
+                border: 0;
+                border-top: 3px solid #00BFFF;
+                width: 60%;
+                margin: 0 auto 15px auto;
+                opacity: 0.6;
+            }}
+            .footer-text {{
+                font-size: 18px;
+                font-family: 'Arial', sans-serif;
+                letter-spacing: 1px;
+            }}
+            .footer a.streamlit {{
+                color: #FF4500;  /* Orange Red for Streamlit */
+                text-decoration: none;
+                font-weight: bold;
+            }}
+            .footer a.azure {{
+                color: #1E90FF;  /* Dodger Blue for Azure */
+                text-decoration: none;
+                font-weight: bold;
+            }}
+            </style>
+            <div class="header-container">
+                <div class="header">
+                    ✈️ Travel Buddy
+                </div>
+                <div class="subheader">
+                    Your go-to travel assistant for the perfect vacation 🏖️
+                </div>
+            </div>
+            <div class="footer">
+                <div class="divider"></div>
+                <div class="footer-text">
+                    Powered by <a href="https://www.streamlit.io" target="_blank" class="streamlit">Streamlit</a> & <a href="https://azure.microsoft.com" target="_blank" class="azure">Azure</a> ✨
+                </div>
+            </div>
+    """,
+            unsafe_allow_html=True,
         )
-        with st.expander("Advanced Settings"):
-            st.markdown("### ✈️ Flight Preferences")
-            flight_class = st.radio(
-                "Flight Class",
-                ["Budget", "Economy", "Business", "First"],
-                horizontal=True,
+
+    def get_selected_language(self) -> str:
+        """Get the currently selected language"""
+        return self._language
+
+    def get_current_config(self) -> TravelConfig:
+        """Get the current configuration from UI inputs"""
+        # Get values from sidebar inputs
+        departure = st.session_state.get("departure", "Taipei")
+        destination = st.session_state.get("destination", "Tokyo")
+        start_date = st.session_state.get("start_date", datetime.date.today())
+        end_date = st.session_state.get(
+            "end_date", datetime.date.today() + datetime.timedelta(days=3)
+        )
+
+        # Create flight preferences
+        flight_prefs = FlightPreferences(
+            budget=st.session_state.get("flight_budget", 10000),
+            flight_class=st.session_state.get("flight_class", "Economy"),
+            time_preference=st.session_state.get("flight_time_pref", "Any"),
+            airline=st.session_state.get("airline_preference", None),
+            with_luggage=st.session_state.get("with_luggage", True),
+            non_stop=st.session_state.get("non_stop", True),
+        )
+
+        # Create hotel preferences
+        hotel_prefs = HotelPreferences(
+            budget=st.session_state.get("hotel_budget", 15000),
+            stars=st.session_state.get("hotel_stars", "3★"),
+            features=st.session_state.get("hotel_features", []),
+            types=st.session_state.get("hotel_type", []),
+        )
+
+        # Create travel preferences
+        travel_prefs = TravelPreferences(
+            language=self._language,
+            travel_style=st.session_state.get("travel_style", []),
+            interests=st.session_state.get("interests", []),
+            transportation=st.session_state.get("transportation", "Public Transport"),
+            dietary=st.session_state.get("dietary", ["None"]),
+        )
+
+        # Create and return config
+        return TravelConfig(
+            departure=departure,
+            destination=destination,
+            start_date=start_date,
+            end_date=end_date,
+            total_budget=st.session_state.get("total_budget", 30000),
+            currency=st.session_state.get("budget_currency", "TWD"),
+            flight_prefs=flight_prefs,
+            hotel_prefs=hotel_prefs,
+            travel_prefs=travel_prefs,
+        )
+
+    def render_sidebar(self):
+        with st.sidebar:
+            self._render_settings_section()
+            self._render_destination_section()
+            self._render_budget_section()
+            self._render_preferences_section()
+
+    def _render_settings_section(self):
+        with st.container(border=True):
+            st.header("⚙️ Settings")
+            self._language = st.selectbox(
+                "Language", ["English", "日本語", "한국어", "繁體中文"], key="language"
             )
+
+    def _render_destination_section(self):
+        with st.container(border=True):
+            st.header("📍 Destination & Dates")
             col1, col2 = st.columns(2)
             with col1:
-                flight_time_pref = st.selectbox(
-                    "Flight Time", ["Any", "Morning", "Afternoon", "Evening", "Red-eye"]
+                st.text_input("Departure", "Taipei", key="departure")
+            with col2:
+                st.text_input("Destination", "Tokyo", key="destination")
+
+            date_range = st.date_input(
+                "🗓️ Travel Dates (Start - End)",
+                [
+                    datetime.date.today(),
+                    datetime.date.today() + datetime.timedelta(days=3),
+                ],
+                key="date_range",
+            )
+
+            if len(date_range) == 2:
+                st.session_state.start_date = date_range[0]
+                st.session_state.end_date = date_range[1]
+
+    def _render_budget_section(self):
+        with st.container(border=True):
+            st.header("💰 Budget")
+
+            st.markdown("#### 🔢 Allocate Your Budget")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.number_input(
+                    "Flight Budget",
+                    min_value=0,
+                    value=10000,
+                    step=500,
+                    key="flight_budget",
                 )
             with col2:
-                airline_preference = st.text_input("Preferred Airline")
+                st.number_input(
+                    "Hotel Budget",
+                    min_value=0,
+                    value=15000,
+                    step=500,
+                    key="hotel_budget",
+                )
+
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                min_total_budget = st.session_state.get(
+                    "flight_budget", 10000
+                ) + st.session_state.get("hotel_budget", 15000)
+
+                st.slider(
+                    "Total Budget",
+                    min_value=min_total_budget,
+                    max_value=100000,
+                    value=max(min_total_budget, 30000),
+                    step=1000,
+                    key="total_budget",
+                )
+            with col2:
+                st.selectbox(
+                    "Currency",
+                    ["USD", "EUR", "JPY", "GBP", "AUD", "TWD"],
+                    key="budget_currency",
+                )
+
+            remaining_budget = st.session_state.get("total_budget", 30000) - (
+                st.session_state.get("flight_budget", 10000)
+                + st.session_state.get("hotel_budget", 15000)
+            )
+            st.success(f"✅ Remaining Budget: {remaining_budget}")
+
+    def _render_preferences_section(self):
+        with st.container(border=True):
+            st.header("✨ Personalization")
+
             col1, col2 = st.columns(2)
             with col1:
-                with_luggage = st.checkbox("Checked Luggage", value=True)
+                st.radio(
+                    "Traveling With",
+                    ["Solo", "Couple", "Family", "Friends", "Business"],
+                    horizontal=True,
+                    key="travel_companions",
+                )
             with col2:
-                non_stop = st.checkbox("Non Stop Flight", value=True)
+                st.selectbox(
+                    "Preferred Transportation",
+                    [
+                        "Public Transport",
+                        "Taxi/Car-hailing",
+                        "Car Rental",
+                        "Walking Only",
+                    ],
+                    key="transportation",
+                )
+
+            st.multiselect(
+                "Travel Style",
+                [
+                    "Relaxed & Chill 😌",
+                    "Adventurous 🧷",
+                    "Cultural & Historical 🏛️",
+                    "Luxury 💎",
+                    "Backpacking 🎒",
+                    "Family-Friendly 👨‍👩‍👧‍👦",
+                    "Romantic 💖",
+                    "Party & Nightlife 🎉",
+                    "Eco & Nature 🌿",
+                ],
+                default=["Relaxed & Chill 😌", "Luxury 💎"],
+                key="travel_style",
+            )
+
+            col3, col4 = st.columns(2)
+            with col3:
+                st.multiselect(
+                    "Dietary Needs",
+                    [
+                        "None",
+                        "Vegetarian",
+                        "Vegan",
+                        "Halal",
+                        "Kosher",
+                        "Gluten-Free",
+                        "Seafood Allergy",
+                    ],
+                    default=["None"],
+                    key="dietary",
+                )
+            with col4:
+                st.multiselect(
+                    "Interests",
+                    [
+                        "Food 🍣",
+                        "Shopping 💼",
+                        "History 🌰",
+                        "Nature 🌳",
+                        "Nightlife 🎉",
+                        "Art & Culture 🎨",
+                        "Photography 📸",
+                        "Theme Parks 🎡",
+                        "Hot Springs ♨️",
+                        "Museum 🖼️",
+                        "Concert 🎶",
+                        "Hiking 🦼",
+                    ],
+                    default=["Food 🍣"],
+                    key="interests",
+                )
+
+            with st.expander("Advanced Settings"):
+                st.markdown("### ✈️ Flight Preferences")
+                st.radio(
+                    "Flight Class",
+                    ["Budget", "Economy", "Business", "First"],
+                    horizontal=True,
+                    key="flight_class",
+                )
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.selectbox(
+                        "Flight Time",
+                        ["Any", "Morning", "Afternoon", "Evening", "Red-eye"],
+                        key="flight_time_pref",
+                    )
+                with col2:
+                    st.text_input("Preferred Airline", key="airline_preference")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.checkbox("Checked Luggage", value=True, key="with_luggage")
+            with col2:
+                st.checkbox("Non Stop Flight", value=True, key="non_stop")
 
             st.markdown("### 🏨 Hotel Preferences")
             col3, col4 = st.columns(2)
             with col3:
-                hotel_stars = st.select_slider(
-                    "Hotel Rating", ["1★", "2★", "3★", "4★", "5★"], value="3★"
+                st.select_slider(
+                    "Hotel Rating",
+                    ["1★", "2★", "3★", "4★", "5★"],
+                    value="3★",
+                    key="hotel_stars",
                 )
-                hotel_features = st.multiselect(
+                st.multiselect(
                     "Hotel Features",
                     [
                         "Non-smoking",
@@ -195,367 +500,666 @@ with st.sidebar:
                         "Late Checkout",
                     ],
                     default=["Non-smoking", "Breakfast Included", "Near Station"],
+                    key="hotel_features",
                 )
             with col4:
-                hotel_type = st.multiselect(
+                st.multiselect(
                     "Hotel Type",
                     ["Hotel", "Hostel", "Airbnb", "Ryokan", "Capsule", "Resort"],
+                    key="hotel_type",
                 )
 
-    with st.container(border=True):
-        st.header("✨ Personalization")
+    def render_itinerary_card(self, plan):
+        return f"""
+        <div style="
+            border: 2px solid #1E90FF;
+            border-radius: 30px;
+            padding: 30px 25px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            margin: 10px auto;
+            width: 100%;
+            min-height: 250px;
+            box-sizing: border-box;
+            background-color: #ffffff;
+            text-align: left;
+        ">
+            <h3 style="color: #1E90FF; font-size: 22px; margin-bottom: 20px; text-align: center;">
+                ✨ {plan['title']}
+            </h3>
+            <p style="text-align: left; font-size: 16px; font-weight: bold; margin-bottom: 10px;">
+                Trip Highlights:
+            </p>
+            <ul style="text-align: left; font-size: 14px; list-style-type: disc; margin-left: 25px; line-height: 1.6;">
+                {"".join([f"<li>{spot}</li>" for spot in plan['highlights']])}
+            </ul>
+            <p style="text-align: left; font-size: 16px; margin-top: 20px;">
+                <strong>Estimated Total Cost:</strong> NT$ {plan['total_cost']:,}
+            </p>
+            <p style="text-align: left; font-size: 16px;">
+                <strong>Average Per Day:</strong> NT$ {plan['avg_per_day']:,}
+            </p>
+        </div>
+        """
 
+    def display_itineraries(self):
+        if st.session_state.itineraries:
+            # Display itinerary summaries and details
+            if st.session_state.selected_plan is None:
+                cols = st.columns(len(st.session_state.itineraries))
+                for idx, plan in enumerate(st.session_state.itineraries):
+                    with cols[idx]:
+                        st.markdown(
+                            self.render_itinerary_card(plan), unsafe_allow_html=True
+                        )
+                        if st.button(
+                            f"View Details of {plan['title']}",
+                            key=f"view_{idx}",
+                            use_container_width=True,
+                        ):
+                            st.session_state.selected_plan = idx
+                            # Initialize chat history with the selected plan
+                            self.chat_history.clear()
+                            self.chat_history.add_message(
+                                "assistant", self.display_chat_itinerary(plan)
+                            )
+                            st.rerun()
+            else:
+                # Get current plan
+                current_plan = st.session_state.itineraries[
+                    st.session_state.selected_plan
+                ]
+
+                # Display chat history with containers
+                for msg in self.chat_history.get_messages():
+                    with st.container():
+                        with st.chat_message(msg.role):
+                            st.markdown(msg.content, unsafe_allow_html=True)
+
+                        # If this is the most recent message and it's from the assistant,
+                        # show the modification UI right after it
+                        if (
+                            msg == self.chat_history.get_messages()[-1]
+                            and msg.role == "assistant"
+                        ):
+                            with st.container():
+                                st.markdown("### 🔄 Want to modify this itinerary?")
+                                selected_activities, modification_instruction = (
+                                    self.display_modification_ui(
+                                        current_plan, current_date=None
+                                    )
+                                )
+
+                                # Handle modification if user submitted
+                                if selected_activities and modification_instruction:
+                                    modified_plan = self.handle_modification_result(
+                                        current_plan,
+                                        selected_activities,
+                                        modification_instruction,
+                                    )
+                                    st.rerun()
+
+    def display_modification_ui(self, plan, current_date):
+        """Display the modification UI for the itinerary"""
+        # Use a consistent key prefix for the session
+        if "current_mod_key_prefix" not in st.session_state:
+            st.session_state.current_mod_key_prefix = f"mod_{int(time.time())}"
+        key_prefix = st.session_state.current_mod_key_prefix
+
+        # Display the complete itinerary and get selected activities
+        selected_activities = self.display_itinerary(plan, key_prefix=key_prefix)
+
+        # Get modification instruction
+        modification_instruction = st.text_area(
+            "Describe your modification:",
+            placeholder="e.g., I want to add more cultural activities or replace shopping with a museum visit.",
+            key=f"{key_prefix}_custom_mod",
+        )
+
+        # Add budget consideration warning if needed
+        if modification_instruction and "luxury" in modification_instruction.lower():
+            current_budget = st.session_state.get("total_budget", 0)
+            st.warning(
+                f"⚠️ This modification might increase the total cost beyond your budget of {current_budget} {st.session_state.get('budget_currency', 'TWD')}"
+            )
+
+        # Create two columns for buttons
+        col1, col2 = st.columns(2)
+
+        # Modify button on the left
+        with col1:
+            modify_clicked = st.button(
+                "💡 Modify Itinerary",
+                key=f"{key_prefix}_modify",
+                use_container_width=True,
+            )
+
+        # Back button on the right
+        with col2:
+            back_clicked = st.button(
+                "🔙 Back to all plans",
+                key=f"{key_prefix}_back",
+                use_container_width=True,
+            )
+
+        if back_clicked:
+            st.session_state.selected_plan = None
+            self.chat_history.clear()
+            st.rerun()
+
+        if modify_clicked:
+            if not selected_activities:
+                st.warning("Please select at least one activity to modify.")
+                return None, None
+            elif not modification_instruction.strip():
+                st.warning("Please provide some direction for modification.")
+                return None, None
+            else:
+                # Generate new key prefix for next modification
+                st.session_state.current_mod_key_prefix = f"mod_{int(time.time())}"
+                return selected_activities, modification_instruction
+
+        return None, None
+
+    def display_chat_itinerary(self, plan):
+        """Display itinerary in chat format with table schedule"""
+        message = f"""
+<div style="padding: 25px; border-radius: 12px; border: 2px solid #1E90FF; margin: 15px 0; background-color: #ffffff; box-shadow: 0 2px 8px rgba(30, 144, 255, 0.1);">
+<h1 style="font-size: 32px; color: #1E90FF; text-align: center; margin-bottom: 30px;">✨ {plan['title']}</h1>
+
+💰 **Cost Summary**:
+- Total Cost: NT$ {plan['total_cost']:,}
+- Average Per Day: NT$ {plan['avg_per_day']:,}
+
+🌟 **Highlights**:
+{chr(10).join([f"- {highlight}" for highlight in plan['highlights']])}
+
+📅 **Daily Schedule**:
+
+<div style="max-height: 500px; overflow-y: auto; overflow-x: auto; margin: 10px 0;">
+<div style="min-width: 800px;">
+<table style="width: 100%; border-collapse: collapse; text-align: center; position: relative; font-family: Arial, sans-serif;">
+<thead style="position: sticky; top: 0; background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 1;">
+<tr>
+<th style="border: 1px solid #ddd; padding: 12px; min-width: 80px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">Time</th>
+"""
+        # Get all dates and format them as MM/DD
+        dates = []
+        formatted_dates = []
+        for day in plan["details"]:
+            date = day["date"]
+            dates.append(date)
+            # Parse the date string (assuming format YYYY-MM-DD)
+            month, day = date.split("-")[1:]
+            formatted_date = f"{int(month)}/{int(day)}"
+            # Add day of week
+            date_obj = datetime.datetime.strptime(date, "%Y-%m-%d")
+            day_of_week = date_obj.strftime("%a")
+            formatted_dates.append(
+                f"{formatted_date}<br><span style='font-size: 13px; opacity: 0.9;'>{day_of_week}</span>"
+            )
+            message += f'<th style="border: 1px solid #ddd; padding: 12px; min-width: 200px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">{formatted_dates[-1]}</th>'
+
+        message += """
+</tr>
+</thead>
+<tbody>
+"""
+
+        # Create time slots for 24 hours with 30-minute intervals
+        time_slots = []
+        for hour in range(24):
+            for minute in [0, 30]:
+                time_slots.append(f"{hour:02d}:{minute:02d}")
+
+        # Create a dictionary to store activities by date and time, with duration
+        activities_by_date = {date: {} for date in dates}
+        for day in plan["details"]:
+            date = day["date"]
+            schedule = day["schedule"]
+            for i, (time, activity) in enumerate(schedule):
+                start_time = self.standardize_time_format(time)
+                # Calculate end time based on next activity
+                if i < len(schedule) - 1:
+                    end_time = self.standardize_time_format(schedule[i + 1][0])
+                else:
+                    # If it's the last activity, assume it lasts 2 hours
+                    hour, minute = map(int, start_time.split(":"))
+                    hour = (hour + 2) % 24
+                    end_time = f"{hour:02d}:{minute:02d}"
+
+                activities_by_date[date][start_time] = {
+                    "activity": activity,
+                    "end_time": end_time,
+                }
+
+        # Calculate rowspans for each activity
+        rowspans = {date: {} for date in dates}
+        for date in dates:
+            for start_time, activity_info in activities_by_date[date].items():
+                start_idx = time_slots.index(start_time)
+                end_idx = time_slots.index(activity_info["end_time"])
+                rowspan = end_idx - start_idx
+                if rowspan > 0:
+                    rowspans[date][start_time] = rowspan
+
+        # Track cells that should be skipped due to rowspan
+        skip_cells = {date: set() for date in dates}
+
+        # Fill the table
+        for time_slot in time_slots:
+            # Format time for better readability
+            hour, minute = time_slot.split(":")
+            hour_int = int(hour)
+            period = "AM" if hour_int < 12 else "PM"
+            if hour_int == 0:
+                hour_int = 12
+            elif hour_int > 12:
+                hour_int -= 12
+            formatted_time = f"{hour_int}:{minute} {period}"
+
+            message += "<tr>"
+            # Add gradient background to time column based on time of day
+            time_bg_color = self._get_time_background_color(int(hour))
+            message += f"""<td style="border: 1px solid #ddd; padding: 12px; font-weight: 500; color: #2c3e50; 
+                          background: {time_bg_color}; font-size: 14px;">{formatted_time}</td>"""
+
+            for date in dates:
+                if time_slot in skip_cells[date]:
+                    continue
+
+                current_activity = None
+                rowspan = 1
+
+                # Check if there's an activity starting at this time
+                if time_slot in activities_by_date[date]:
+                    activity_info = activities_by_date[date][time_slot]
+                    current_activity = activity_info["activity"]
+                    if time_slot in rowspans[date]:
+                        rowspan = rowspans[date][time_slot]
+                        # Mark cells to skip
+                        start_idx = time_slots.index(time_slot)
+                        for i in range(start_idx + 1, start_idx + rowspan):
+                            if i < len(time_slots):
+                                skip_cells[date].add(time_slots[i])
+
+                cell_style = "border: 1px solid #ddd; padding: 12px; font-size: 14px;"
+                if current_activity:
+                    cell_style += (
+                        " background-color: #ebf5ff; color: #2c3e50; font-weight: 500;"
+                    )
+
+                if rowspan > 1:
+                    message += f'<td style="{cell_style}" rowspan="{rowspan}">{current_activity or ""}</td>'
+                else:
+                    message += f'<td style="{cell_style}">{current_activity or ""}</td>'
+
+            message += "</tr>"
+
+        message += """
+</tbody>
+</table>
+</div>
+</div>
+</div>
+"""
+        return message
+
+    def _get_time_background_color(self, hour: int) -> str:
+        """Get background color gradient based on time of day"""
+        if 6 <= hour < 12:  # Morning
+            return "linear-gradient(90deg, #fff4e6 0%, #fff8f0 100%)"
+        elif 12 <= hour < 18:  # Afternoon
+            return "linear-gradient(90deg, #e6f3ff 0%, #f0f8ff 100%)"
+        elif 18 <= hour < 22:  # Evening
+            return "linear-gradient(90deg, #fff0f5 0%, #fff5fa 100%)"
+        else:  # Night
+            return "linear-gradient(90deg, #f5f5f5 0%, #fafafa 100%)"
+
+    def handle_modification_result(
+        self, plan, selected_activities, modification_instruction
+    ):
+        """Handle the modification result and update the plan"""
+        if not selected_activities or not modification_instruction:
+            return plan
+
+        with st.spinner("🤔 Thinking about your modification request..."):
+            try:
+                # Add user's request to chat history
+                user_message = (
+                    "I would like to modify these activities:\n"
+                    + "\n".join(
+                        [
+                            f"- {act['activity']} on {act['date']}"
+                            for act in selected_activities
+                        ]
+                    )
+                    + f"\n\nModification request: {modification_instruction}"
+                )
+
+                self.chat_history.add_message("user", user_message)
+
+                # Get mock modified itinerary
+                modified_plan = get_mock_modified_itinerary(
+                    plan, selected_activities, modification_instruction
+                )
+
+                # Add modified itinerary to chat history
+                self.chat_history.add_message(
+                    "assistant", self.display_chat_itinerary(modified_plan)
+                )
+
+                # Update the current plan in session state
+                if st.session_state.selected_plan is not None:
+                    st.session_state.itineraries[st.session_state.selected_plan] = (
+                        modified_plan
+                    )
+
+                # Clear modification form by generating a new key prefix
+                st.session_state.current_mod_key_prefix = f"mod_{int(time.time())}"
+
+                # Clear any selected checkboxes
+                for key in list(st.session_state.keys()):
+                    if key.startswith("mod_") and key.endswith("_custom_mod"):
+                        del st.session_state[key]
+
+                return modified_plan
+
+            except Exception as e:
+                error_message = f"❌ I encountered an error while trying to modify the itinerary: {str(e)}"
+                st.error(error_message)
+                self.chat_history.add_message("assistant", error_message)
+                return plan
+
+    def _generate_modification_summary(self, old_plan, new_plan, modified_activities):
+        """Generate a summary of the modifications made to the plan"""
+        summary = []
+
+        # Track modified dates
+        modified_dates = {act["date"] for act in modified_activities}
+
+        for date in modified_dates:
+            old_activities = [act["activity"] for act in old_plan.get(date, [])]
+            new_activities = [act["activity"] for act in new_plan.get(date, [])]
+
+            # Find differences
+            removed = set(old_activities) - set(new_activities)
+            added = set(new_activities) - set(old_activities)
+
+            if removed or added:
+                summary.append(f"\n📅 {date}:")
+                if removed:
+                    summary.append("Removed:")
+                    for activity in removed:
+                        summary.append(f"- ❌ {activity}")
+                if added:
+                    summary.append("Added:")
+                    for activity in added:
+                        summary.append(f"- ✨ {activity}")
+
+        return (
+            "\n".join(summary) if summary else "No changes were made to the itinerary."
+        )
+
+    def display_itinerary(self, plan, show_checkboxes=True, key_prefix=""):
+        """Display the complete itinerary in a consistent format
+
+        Args:
+            plan: The itinerary plan to display
+            show_checkboxes: Whether to show modification checkboxes
+            key_prefix: Prefix for checkbox keys to ensure uniqueness
+
+        Returns:
+            list: List of selected activities if show_checkboxes is True, else empty list
+        """
+        selected_activities = []
+
+        # Display plan title and cost summary
+        st.markdown(f"### ✨ {plan['title']}")
         col1, col2 = st.columns(2)
         with col1:
-            travel_companions = st.radio(
-                "Traveling With",
-                ["Solo", "Couple", "Family", "Friends", "Business"],
-                horizontal=True,
-            )
+            st.markdown(f"**Total Cost:** NT$ {plan['total_cost']:,}")
         with col2:
-            transportation = st.selectbox(
-                "Preferred Transportation",
-                ["Public Transport", "Taxi/Car-hailing", "Car Rental", "Walking Only"],
-            )
+            st.markdown(f"**Average Per Day:** NT$ {plan['avg_per_day']:,}")
 
-        travel_style = st.multiselect(
-            "Travel Style",
-            [
-                "Relaxed & Chill 😌",
-                "Adventurous 🧷",
-                "Cultural & Historical 🏛️",
-                "Luxury 💎",
-                "Backpacking 🎒",
-                "Family-Friendly 👨‍👩‍👧‍👦",
-                "Romantic 💖",
-                "Party & Nightlife 🎉",
-                "Eco & Nature 🌿",
-            ],
-            default=["Relaxed & Chill 😌", "Luxury 💎"],
-        )
-
-        col3, col4 = st.columns(2)
-        with col3:
-            dietary = st.multiselect(
-                "Dietary Needs",
-                [
-                    "None",
-                    "Vegetarian",
-                    "Vegan",
-                    "Halal",
-                    "Kosher",
-                    "Gluten-Free",
-                    "Seafood Allergy",
-                ],
-                default=["None"],
-            )
-        with col4:
-            interests = st.multiselect(
-                "Interests",
-                [
-                    "Food 🍣",
-                    "Shopping 💼",
-                    "History 🌰",
-                    "Nature 🌳",
-                    "Nightlife 🎉",
-                    "Art & Culture 🎨",
-                    "Photography 📸",
-                    "Theme Parks 🎡",
-                    "Hot Springs ♨️",
-                    "Museum 🖼️",
-                    "Concert 🎶",
-                    "Hiking 🦼",
-                ],
-                default=["Food 🍣"],
-            )
-
-# 根據語言設置按鈕文字
-button_text = "Generate Itinerary"
-if language == "繁體中文":
-    button_text = "生成行程"
-elif language == "日本語":
-    button_text = "行程を生成"
-elif language == "한국어":
-    button_text = "여행 일정 생성"
-
-# 如果按下按鈕，觸發行程生成
-if st.button(button_text, use_container_width=True):
-    # 呼叫 create_travel_agent 並執行後續邏輯
-    agent = create_travel_agent()
-
-    # 生成的 prompt 和處理流程
-    prompt = f"""
-    Please help plan 3 personalized itinerary for the user to choose with the following information:
-    Consider the below details, budget and weather.
-
-    Departure: {departure}
-    Destination: {destination}
-    Total Days: {days}
-    Start Date: {start_date}
-    End Date: {end_date}
-    Budget: {total_budget} {budget_currency}
-
-    Flight Preferences:
-    - Flight Budget: {flight_budget}
-    - Class: {flight_class}
-    - Preferred Time: {flight_time_pref}
-    - Preferred Airline: {airline_preference or "None"}
-    - Checked Luggage: {'Yes' if with_luggage else 'No'}
-    - Non-Stop Flight: {'Yes' if non_stop else 'No'}
-
-    Hotel Preferences:
-    - Hotel Budget: {hotel_budget}
-    - Stars: {hotel_stars}
-    - Features: {', '.join(hotel_features) if hotel_features else 'None'}
-    - Type: {', '.join(hotel_type) if hotel_type else 'None'}
-
-    Companions: {travel_companions}
-    Transportation Preference: {transportation}
-    Travel Style: {', '.join(travel_style) if travel_style else 'None'}
-    Dietary Requirements: {', '.join(dietary) if dietary else 'None'}
-    Interests: {', '.join(interests) if interests else 'None'}
-    Remaining Budget: {total_budget - (flight_budget + hotel_budget)}
-
-    Language: {lang_code}
-    You need to use `format_itinerary` to return the result in json format and only the json format.
-    """
-
-    emoji_map = {
-        "search_flight": "✈️",
-        "search_hotel": "🏨",
-        "get_weather": "⛅️",
-        "search_and_generate_itinerary": "🗺️",
-        "format_itinerary": "📋",
-    }
-
-    with st.spinner("🧠 Agent is reasoning..."):
-        progress_bar = st.progress(0)
-        progress_text = st.empty()
-        thought_block = st.expander("", expanded=True)
-
-        # Initialize counter and list for tool names
-        tool_call_count = 0
-        function_names = []  # List to store all function names
-
-        # Dynamically collect tool calls and display detailed output
-        with thought_block:
-            for event in agent.stream(
-                {"messages": [{"role": "user", "content": prompt}]}
-            ):
-                if "agent" in event:
-                    for message in event["agent"]["messages"]:
-                        # Check if message contains tool calls
-                        if hasattr(message, "additional_kwargs"):
-                            tool_calls = getattr(message, "additional_kwargs", {}).get(
-                                "tool_calls", []
-                            )
-
-                            for tool_call in tool_calls:
-                                tool_name = tool_call["function"]["name"]
-                                tool_args = tool_call["function"]["arguments"]
-                                emoji = emoji_map.get(tool_name, "🔧")
-
-                                with st.chat_message("assistant"):
-                                    st.markdown(f"{emoji} **Calling `{tool_name}`**")
-                                    st.code(tool_args, language="json")
-
-                                # Update progress bar dynamically
-                                tool_call_count += 1
-                                progress = min(
-                                    tool_call_count / (tool_call_count + 1), 1.0
-                                )  # Dynamic counting for progress bar
-                                progress_bar.progress(progress)
-
-                        # If it is the final result, display the final output
-                        if hasattr(message, "content") and message.content:
-                            raw_content = message.content
-                            progress_bar.progress(1.0)  # Complete
-                            progress_text.text("✅ Process complete! 🎉")
-                            break  # Break the loop after getting the final result
-
-    cleaned = re.search(r"```json(.*?)```", raw_content, re.DOTALL)
-    itineraries = (
-        json.loads(cleaned.group(1).strip())
-        if cleaned
-        else json.loads(raw_content.strip())
-    )
-
-    # # 顯示結果
-    # st.subheader("📝 Final Itinerary")
-    # st.json(itineraries)
-    # st.write(itineraries)
-
-    # # 儲存生成的計劃
-    st.session_state.itineraries = itineraries
-    st.session_state.selected_plan = None
-
-    # with st.spinner("🧠 Agent is reasoning..."):
-    #     thought_block = st.expander("🧠 Agent Thought Process", expanded=True)
-
-    #     with thought_block:
-    #         st.write("🤖 Agent: Calling `get_weather` for your destination...")
-    #         time.sleep(2)
-    #         st.info("🌤️ Weather in Tokyo: Mostly sunny, 24°C")
-
-    #         st.write(
-    #             "🤖 Agent: Calling `search_and_generate_itinerary` with your preferences..."
-    #         )
-    #         progress_text = st.empty()
-    #         for i in range(1, 4):
-    #             time.sleep(1)
-    #             progress_text.info(
-    #                 f"🔍 Found {i} candidate itinerary{'...' if i < 3 else '!'}"
-    #             )
-    #         st.success("🗺️ All 3 itineraries generated successfully.")
-
-    #         st.write("🤖 Agent: Calling `format_itinerary` to organize plan details...")
-    #         time.sleep(1)
-    #         st.success("✅ Itinerary formatting complete.")
-
-    # # 完成後才儲存到 session_state
-    # st.session_state.itineraries = get_mock_itineraries()
-    # st.session_state.selected_plan = None
-    # st.rerun()
-
-
-if st.session_state.itineraries:
-    # 顯示行程計劃的摘要，並可以查看詳情
-    if st.session_state.selected_plan is None:
-        cols = st.columns(len(st.session_state.itineraries))
-        for idx, plan in enumerate(st.session_state.itineraries):
-            with cols[idx]:
-                st.markdown(
-                    f"""
-                    <div style="
-                        border: 2px solid #1E90FF;
-                        border-radius: 30px;
-                        padding: 30px 25px;
-                        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-                        margin: 10px auto;
-                        width: 100%;
-                        min-height: 250px;
-                        box-sizing: border-box;
-                        background-color: #ffffff;
-                        text-align: left;
-                    ">
-                        <h3 style="color: #1E90FF; font-size: 22px; margin-bottom: 20px; text-align: center;">
-                            ✨ {plan['title']}
-                        </h3>
-                        <p style="text-align: left; font-size: 16px; font-weight: bold; margin-bottom: 10px;">
-                            Trip Highlights:
-                        </p>
-                        <ul style="text-align: left; font-size: 14px; list-style-type: disc; margin-left: 25px; line-height: 1.6;">
-                            {"".join([f"<li>{spot}</li>" for spot in plan['highlights']])}
-                        </ul>
-                        <p style="text-align: left; font-size: 16px; margin-top: 20px;">
-                            <strong>Estimated Total Cost:</strong> NT$ {plan['total_cost']:,}
-                        </p>
-                        <p style="text-align: left; font-size: 16px;">
-                            <strong>Average Per Day:</strong> NT$ {plan['avg_per_day']:,}
-                        </p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-                # st.markdown(f"### ✨ {plan['title']}")
-                # st.markdown("**Trip Highlights:**")
-                # for spot in plan["highlights"]:
-                #     st.markdown(f"- {spot}")
-                # st.markdown(f"**Estimated Total Cost:** NT$ {plan['total_cost']:,}")
-                # st.markdown(f"**Average Per Day:** NT$ {plan['avg_per_day']:,}")
-                if st.button(
-                    f"View Details of {plan['title']}",
-                    key=f"view_{idx}",
-                    use_container_width=True,
-                ):
-                    st.session_state.selected_plan = idx
-                    st.rerun()
-    else:
-        # 顯示選定的行程詳細資料
-        plan = st.session_state.itineraries[st.session_state.selected_plan]
-        st.markdown(f"## ✨ Detailed Itinerary: {plan['title']}")
-        for day in plan["details"]:
-            st.markdown(f"### 📅 Date {day['date']}")
-            schedule_table = {"Time Range": [], "Activity": []}
-
-            schedule = day["schedule"]
-            for i, (start_time, item) in enumerate(schedule):
-                # 決定結束時間（除最後一筆外）
-                if i + 1 < len(schedule):
-                    end_time = schedule[i + 1][0]
-                    time_range = f"{start_time} ~ {end_time}"
-                else:
-                    time_range = f"{start_time} ~ (End)"
-
-                # 配對 emoji
-                if any(
-                    keyword in item.lower()
-                    for keyword in ["breakfast", "lunch", "dinner"]
-                ):
-                    emoji = "🍽️"
-                elif any(
-                    keyword in item.lower() for keyword in ["check-in", "check out"]
-                ):
-                    emoji = "🛏️"
-                elif any(keyword in item.lower() for keyword in ["airport", "flight"]):
-                    emoji = "✈️"
-                elif any(
-                    keyword in item.lower()
-                    for keyword in ["museum", "temple", "shrine", "art", "tour"]
-                ):
-                    emoji = "🏛️"
-                elif any(keyword in item.lower() for keyword in ["shopping", "market"]):
-                    emoji = "💼️"
-                elif any(
-                    keyword in item.lower() for keyword in ["onsen", "relax", "spa"]
-                ):
-                    emoji = "♨️"
-                else:
-                    emoji = "⏰"
-
-                schedule_table["Time Range"].append(time_range)
-                schedule_table["Activity"].append(f"{emoji} {item}")
-
-            st.table(schedule_table)
-
-        st.markdown(f"\n**Total Cost:** NT$ {plan['total_cost']:,}")
-        st.markdown(f"**Avg/Day:** NT$ {plan['avg_per_day']:,}")
         st.markdown("---")
 
-        st.markdown(
-            "🔽 Click the button below to automatically book the following items:"
-        )
-        st.markdown(
-            """
-        - 🛫 Flights (based on your preferred time and airline)
-        - 🏨 Hotels (with breakfast / near train stations)
-        - 🚖 Airport transfers and local transportation passes
-        - 🎟️ Attraction tickets (if included in the itinerary)
+        # Display schedule for each day
+        for day_schedule in plan["details"]:
+            with st.expander(f"📅 Date {day_schedule['date']}", expanded=True):
+                # Create activities list
+                activities = []
+                for i, (start_time, item) in enumerate(day_schedule["schedule"]):
+                    # Determine end time (except for last item)
+                    if i + 1 < len(day_schedule["schedule"]):
+                        end_time = self.standardize_time_format(
+                            day_schedule["schedule"][i + 1][0]
+                        )
+                        time_range = f"{self.format_time_range(self.standardize_time_format(start_time))} ~ {self.format_time_range(end_time)}"
+                    else:
+                        time_range = f"{self.format_time_range(self.standardize_time_format(start_time))} ~ (End)"
+
+                    # Match emoji
+                    if any(
+                        keyword in item.lower()
+                        for keyword in ["breakfast", "lunch", "dinner"]
+                    ):
+                        emoji = "🍽️"
+                    elif any(
+                        keyword in item.lower() for keyword in ["check-in", "check out"]
+                    ):
+                        emoji = "🛏️"
+                    elif any(
+                        keyword in item.lower() for keyword in ["airport", "flight"]
+                    ):
+                        emoji = "✈️"
+                    elif any(
+                        keyword in item.lower()
+                        for keyword in ["museum", "temple", "shrine", "art", "tour"]
+                    ):
+                        emoji = "🏛️"
+                    elif any(
+                        keyword in item.lower() for keyword in ["shopping", "market"]
+                    ):
+                        emoji = "💼️"
+                    elif any(
+                        keyword in item.lower() for keyword in ["onsen", "relax", "spa"]
+                    ):
+                        emoji = "♨️"
+                    else:
+                        emoji = "⏰"
+
+                    activities.append(
+                        {
+                            "time_range": time_range,
+                            "activity": f"{emoji} {item}",
+                            "raw_activity": item,
+                            "time": start_time,
+                        }
+                    )
+
+                # Display activities using columns layout
+                for activity in activities:
+                    if show_checkboxes:
+                        cols = st.columns([7, 1])
+                        with cols[0]:
+                            st.markdown(
+                                f"**{activity['time_range']}**: {activity['activity']}"
+                            )
+                        with cols[1]:
+                            checkbox_key = f"{key_prefix}_mod_{day_schedule['date']}_{activity['raw_activity']}"
+
+                            # Initialize the session state for this checkbox if not exists
+                            if checkbox_key not in st.session_state:
+                                st.session_state[checkbox_key] = False
+
+                            # Create checkbox with the session state value
+                            if st.checkbox(
+                                "Modify",
+                                key=checkbox_key,
+                                value=st.session_state[checkbox_key],
+                            ):
+                                selected_activities.append(
+                                    {
+                                        "date": day_schedule["date"],
+                                        "time": activity["time"],
+                                        "activity": activity["raw_activity"],
+                                    }
+                                )
+                    else:
+                        st.markdown(
+                            f"**{activity['time_range']}**: {activity['activity']}"
+                        )
+
+        return selected_activities
+
+    def standardize_time_format(self, time_str):
+        """Standardize time string to 24-hour format (HH:MM)
+
+        Args:
+                time_str (str): Time string in various formats
+
+        Returns:
+                str: Standardized time string in HH:MM format
         """
-        )
+        try:
+            # Remove extra spaces and handle special cases
+            time_str = time_str.strip()
+            if time_str == "(End)":
+                return "23:59"
 
-        if not st.session_state.booking_done:
-            if st.button("✅ Book All (Flights, Hotels, Transport)"):
-                with st.spinner("⏳ Booking in progress... Please wait a moment."):
-                    time.sleep(5)  # 模擬API請求等待時間
-                st.success(
-                    "🎉 Booking confirmed! All items have been successfully arranged."
-                )
-                st.session_state.booking_done = True
-                st.rerun()
-        else:
-            if st.button("💳 Proceed to Payment"):
-                # Simulated payment flow
-                st.markdown("Please click the link below to complete your payment:")
-                st.markdown(
-                    "[🔗 Go to Payment Page](https://mockpayment.example.com/pay?plan_id=1234)",
-                    unsafe_allow_html=True,
-                )
-                st.info(
-                    "💡 You will receive an email confirmation once payment is complete."
-                )
+            # Remove any extra spaces between numbers and AM/PM
+            time_str = time_str.replace(" AM", "AM").replace(" PM", "PM")
+            time_str = time_str.replace("AM ", "AM").replace("PM ", "PM")
 
-        if st.button("🔙 Back to all plans"):
+            # Handle cases like "1: 00 PM" or "1:00PM"
+            if ":" in time_str:
+                # Split by colon and clean up spaces
+                hour_part, minute_part = time_str.split(":")
+                hour_part = hour_part.strip()
+                # Extract minutes and meridiem
+                minute_match = re.match(r"\s*(\d+)\s*(AM|PM)?", minute_part.upper())
+                if minute_match:
+                    minutes = int(minute_match.group(1))
+                    meridiem = minute_match.group(2)
+            else:
+                # Handle cases without colon
+                match = re.match(r"\s*(\d+)\s*(AM|PM)?", time_str.upper())
+                if match:
+                    hour_part = match.group(1)
+                    minutes = 0
+                    meridiem = match.group(2)
+                else:
+                    return time_str
+
+            # Convert hour to int
+            hours = int(hour_part)
+
+            # Convert to 24-hour format if AM/PM is present
+            if meridiem:
+                if meridiem == "PM" and hours < 12:
+                    hours += 12
+                elif meridiem == "AM" and hours == 12:
+                    hours = 0
+
+            # Ensure hours and minutes are within valid ranges
+            hours = hours % 24
+            minutes = minutes % 60
+
+            # Format the time
+            return f"{hours:02d}:{minutes:02d}"
+        except Exception as e:
+            print(f"Error processing time {time_str}: {str(e)}")
+            return time_str
+
+    def format_time_range(self, time_str):
+        """Format time range for display
+
+        Args:
+            time_str (str): Time string in HH:MM format
+
+        Returns:
+            str: Formatted time string in HH:MM format
+        """
+        try:
+            if time_str == "(End)":
+                return time_str
+
+            if ":" not in time_str:
+                return time_str
+
+            hours, minutes = map(int, time_str.split(":"))
+            return f"{hours:02d}:{minutes:02d}"
+        except Exception as e:
+            print(f"Error formatting time {time_str}: {str(e)}")
+            return time_str
+
+
+class TravelApp:
+    def __init__(self):
+        self.ui = TravelUI()
+        self.config = None
+        self.planner = None
+
+    def initialize_session_state(self):
+        """Initialize Streamlit session state variables"""
+        if "itineraries" not in st.session_state:
+            st.session_state.itineraries = None
+        if "selected_plan" not in st.session_state:
             st.session_state.selected_plan = None
-            st.rerun()
+        if "booking_done" not in st.session_state:
+            st.session_state.booking_done = False
+        if "chat_history" not in st.session_state:
+            st.session_state.chat_history = []
+
+    def setup(self):
+        """Setup the application"""
+        self.ui.setup_page()
+        self.initialize_session_state()
+
+    def run(self):
+        """Run the application"""
+        self.setup()
+
+        # Render sidebar and get configuration
+        self.ui.render_sidebar()
+
+        # Get button text based on language
+        button_text = self._get_generate_button_text()
+
+        # Handle generate button click
+        if st.button(button_text, use_container_width=True):
+            self._handle_generate_click()
+
+        # Display itineraries if available
+        self.ui.display_itineraries()
+
+    def _get_generate_button_text(self):
+        """Get the generate button text based on selected language"""
+        language = self.ui.get_selected_language()
+        return {
+            "English": "Generate Itinerary",
+            "繁體中文": "生成行程",
+            "日本語": "行程を生成",
+            "한국어": "여행 일정 생성",
+        }.get(language, "Generate Itinerary")
+
+    def _handle_generate_click(self):
+        """Handle generate button click event"""
+        with st.spinner("🧠 Generating itineraries..."):
+            # Create config from UI inputs
+            self.config = self.ui.get_current_config()
+
+            # Create planner with config
+            self.planner = ItineraryPlanner(self.config)
+
+            # Generate itineraries
+            itineraries = self.planner.generate_itineraries()
+
+            # Save to session state
+            st.session_state.itineraries = itineraries
+            st.session_state.selected_plan = None
+
+
+if __name__ == "__main__":
+    app = TravelApp()
+    app.run()

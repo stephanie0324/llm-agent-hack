@@ -1,12 +1,12 @@
-from langchain.tools import tool
-from typing import TypedDict, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Dict, List
+
 import requests
 import urllib3
-
 from config import settings
-from utils import get_response_from_ai_service
+from langchain.tools import tool
 from schemas.schema import ItineraryPlan
+from utils import get_response_from_ai_service
 
 # Suppress SSL warnings if needed
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -277,6 +277,47 @@ def format_itinerary(
 
     try:
         # Make the call to the AI service (get_response_from_ai_service should be implemented as per your setup)
+        return get_response_from_ai_service(query)
+
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+
+@tool
+def modify_itinerary(
+    current_itinerary: Dict,
+    modification_request: str,
+    preferences: Dict,
+) -> Dict:
+    """
+    🔄 修改現有行程根據用戶的要求和偏好。
+
+    Args:
+        current_itinerary (Dict): 當前需要修改的行程
+        modification_request (str): 用戶的具體修改要求
+        preferences (Dict): 用戶偏好，包括預算、興趣等
+
+    Returns:
+        Dict: 修改後的行程
+    """
+    try:
+        query = f"""
+        Please modify the following itinerary according to the user's request and preferences:
+        
+        Current Itinerary:
+        {current_itinerary}
+        
+        Modification Request:
+        {modification_request}
+        
+        User Preferences:
+        {preferences}
+        
+        Please maintain the same time structure but modify the selected activities according to the request.
+        Consider the user's preferences while making modifications.
+        Ensure the modifications are realistic and maintain the flow of the itinerary.
+        """
+
         return get_response_from_ai_service(query)
 
     except Exception as e:
