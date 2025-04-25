@@ -5,7 +5,6 @@ from tools import (
     format_itinerary,
     get_travel_time,
     get_weather,
-    modify_itinerary,
     search_activities,
     search_and_generate_itinerary,
     search_flight,

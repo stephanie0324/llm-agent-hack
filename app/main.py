@@ -401,6 +401,7 @@ class ModifyItineraryAgent:
         modification_instruction: str,
         history: ItineraryHistory,
     ) -> dict:
+        # for development
         # return get_mock_modified_itinerary(
         #     original_plan, selected_activities, modification_instruction
         # )
@@ -1105,12 +1106,13 @@ class TravelUI:
                 cell.addEventListener('click', function(e) {{
                     const details = document.getElementById('activity-details');
                     if (details) {{
-                        details.innerHTML = `
+                        details.innerHTML = 
                             <h4 style="margin: 0 0 10px 0; color: #1E90FF;">🎯 活動詳情</h4>
                             <p style="margin: 5px 0;"><strong>活動：</strong>${{this.dataset.activity}}</p>
-                            <p style="margin: 5px 0;"><strong>時間：</strong>${{this.dataset.time}}</p>
+                            <p style="margin: 5px 0;"><strong>開始時間：</strong>${{this.dataset.startTime}}</p>
+                            <p style="margin: 5px 0;"><strong>結束時間：</strong>${{this.dataset.endTime}}</p>
                             <p style="margin: 5px 0;"><strong>描述：</strong>${{this.dataset.description}}</p>
-                        `;
+                        ;
                         
                         const rect = this.getBoundingClientRect();
                         details.style.left = rect.left + window.scrollX + 'px';
@@ -1288,7 +1290,7 @@ class TravelUI:
                     display_time = f"{self.format_time_range(time_slot)} ~ {self.format_time_range(activity_info['end_time'])}"
 
                     # Add data attributes for the popup
-                    data_attrs = f'data-activity="{current_activity}" data-time="{display_time}" data-description="{description}"'
+                    data_attrs = f'data-activity="{current_activity}" data-start-time="{display_time}" data-end-time="{activity_info["end_time"]}" data-description="{description}"'
                 else:
                     data_attrs = ""
 
@@ -1682,9 +1684,9 @@ class TravelApp:
             unsafe_allow_html=True,
         )
         # Handle generate button click
-        # 創建按鈕並處理點擊事件
+        # Handle button click event
         if st.button(button_text, use_container_width=True):
-            # 當按鈕被點擊時執行的操作
+            # Operation when button is clicked
             self._handle_generate_click()
 
         # Display itineraries if available
