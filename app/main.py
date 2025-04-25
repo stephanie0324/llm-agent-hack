@@ -141,7 +141,7 @@ class ItineraryPlanner:
         }
 
     def generate_prompt(self) -> str:
-        # 從 session state 獲取所有需要的變數
+        # From session state, get all necessary variables
         departure = st.session_state.get("departure", "Taipei")
         destination = st.session_state.get("destination", "Tokyo")
         start_date = st.session_state.get("start_date", datetime.date.today())
@@ -150,32 +150,32 @@ class ItineraryPlanner:
         )
         days = (end_date - start_date).days
 
-        # 預算相關
+        # Budget related
         total_budget = st.session_state.get("total_budget", 30000)
         budget_currency = st.session_state.get("budget_currency", "TWD")
         flight_budget = st.session_state.get("flight_budget", 10000)
         hotel_budget = st.session_state.get("hotel_budget", 15000)
 
-        # 航班偏好
+        # Flight preferences
         flight_class = st.session_state.get("flight_class", "Economy")
         flight_time_pref = st.session_state.get("flight_time_pref", "Any")
         airline_preference = st.session_state.get("airline_preference", None)
         with_luggage = st.session_state.get("with_luggage", True)
         non_stop = st.session_state.get("non_stop", True)
 
-        # 住宿偏好
+        # Accommodation preferences
         hotel_stars = st.session_state.get("hotel_stars", "3★")
         hotel_features = st.session_state.get("hotel_features", [])
         hotel_type = st.session_state.get("hotel_type", [])
 
-        # 旅行偏好
+        # Travel preferences
         travel_companions = st.session_state.get("travel_companions", "Solo")
         transportation = st.session_state.get("transportation", "Public Transport")
         travel_style = st.session_state.get("travel_style", [])
         dietary = st.session_state.get("dietary", ["None"])
         interests = st.session_state.get("interests", [])
 
-        # 語言設定
+        # Language settings
         lang_code = st.session_state.get("language", "English")
 
         return f"""
@@ -216,7 +216,7 @@ class ItineraryPlanner:
 
     def generate_itineraries(self):
         # Use mock data for development
-        return get_mock_itineraries()
+        # return get_mock_itineraries()
         prompt = self.generate_prompt()
 
         with st.spinner("🧠 Agent is reasoning..."):
@@ -281,11 +281,11 @@ class ItineraryPlanner:
                         raise Exception("No content received from agent")
 
             except Exception as e:
-                st.error(f"發生錯誤：{str(e)}")
-                # 如果發生錯誤，返回 mock 資料
+                st.error(f"Error occurred: {str(e)}")
+                # If an error occurs, return mock data
                 return get_mock_itineraries()
             finally:
-                # 確保進度條完成
+                # Ensure progress bar is completed
                 progress_bar.progress(1.0)
 
 
@@ -401,9 +401,9 @@ class ModifyItineraryAgent:
         modification_instruction: str,
         history: ItineraryHistory,
     ) -> dict:
-        return get_mock_modified_itinerary(
-            original_plan, selected_activities, modification_instruction
-        )
+        # return get_mock_modified_itinerary(
+        #     original_plan, selected_activities, modification_instruction
+        # )
         # Prepare prompt
         prompt = self._generate_modification_prompt(
             original_plan, selected_activities, modification_instruction

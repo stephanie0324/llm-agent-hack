@@ -304,15 +304,15 @@ def modify_itinerary(
     preferences: Dict,
 ) -> Dict:
     """
-    🔄 修改現有行程根據用戶的要求和偏好。
+    🔄 Modify the existing itinerary based on user requests and preferences.
 
     Args:
-        current_itinerary (Dict): 當前需要修改的行程
-        modification_request (str): 用戶的具體修改要求
-        preferences (Dict): 用戶偏好，包括預算、興趣等
+        current_itinerary (Dict): The current itinerary to be modified
+        modification_request (str): Specific modification requests from the user
+        preferences (Dict): User preferences, including budget, interests, etc.
 
     Returns:
-        Dict: 修改後的行程
+        Dict: Modified itinerary
     """
     try:
         query = f"""
