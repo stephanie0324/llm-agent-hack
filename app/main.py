@@ -1147,14 +1147,13 @@ class TravelUI:
     }});
 </script>
 
-<h1 style="font-size: 32px; color: #1E90FF; text-align: center; margin-bottom: 30px;">✨ {plan['title']}</h1>
+<h1 style="font-size: 32px; color: #1E90FF; text-align: center; margin-bottom: 0px;">✨ {plan['title']}</h1>
 
-💰 **Cost Summary**:
-- Total Cost: NT$ {plan['total_cost']:,}
-- Average Per Day: NT$ {plan['avg_per_day']:,.3f}
+<div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+  {"".join([f'<span style="background-color: #f0f8ff; padding: 6px 12px; border-radius: 20px; border: 1px solid #1E90FF; font-size: 14px;">{highlight}</span>' for highlight in plan['highlights']])}
+</div>
 
-🌟 **Highlights**:
-{chr(10).join([f"- {highlight}" for highlight in plan['highlights']])}
+💰 **Total Cost**: NT$ {plan['total_cost']:,}
 
 📅 **Daily Schedule**:
 
