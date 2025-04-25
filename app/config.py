@@ -34,7 +34,7 @@ class Settings(BaseSettings):
                 "max_tokens": 5000,
                 "temperature": 0,
                 "max_retries": 0,
-                "request_timeout": 60,
+                "request_timeout": 90,
             },
         },
         "LOCAL": {
