@@ -105,15 +105,27 @@ class ChatHistory:
 class ItineraryHistory:
     def __init__(self):
         self.modifications = []
+        if "modification_thoughts" not in st.session_state:
+            st.session_state.modification_thoughts = []
 
     def add_modification(self, mod: ItineraryModification):
         self.modifications.append(mod)
 
+    def add_modification_thoughts(self, thoughts: List[Dict]):
+        if "modification_thoughts" not in st.session_state:
+            st.session_state.modification_thoughts = []
+        st.session_state.modification_thoughts.append(thoughts)
+
     def get_latest_modification(self) -> Optional[ItineraryModification]:
         return self.modifications[-1] if self.modifications else None
 
+    def get_all_thoughts(self) -> List[List[Dict]]:
+        return st.session_state.modification_thoughts
+
     def clear(self):
         self.modifications = []
+        if "modification_thoughts" in st.session_state:
+            st.session_state.modification_thoughts = []
 
 
 class ItineraryPlanner:
@@ -203,6 +215,8 @@ class ItineraryPlanner:
         """
 
     def generate_itineraries(self):
+        # Use mock data for development
+        return get_mock_itineraries()
         prompt = self.generate_prompt()
 
         with st.spinner("🧠 Agent is reasoning..."):
@@ -275,6 +289,231 @@ class ItineraryPlanner:
                 progress_bar.progress(1.0)
 
 
+class ModifyItineraryAgent:
+    def __init__(self, config: TravelConfig):
+        self.config = config
+        self.agent = create_modify_itinerary_agent()
+        self.emoji_map = {
+            "search_activities": "🎯",
+            "get_travel_time": "🚗",
+            "check_opening_hours": "⏰",
+            "get_weather": "🌤️",
+            "format_itinerary": "📋",
+        }
+
+    def _generate_modification_prompt(
+        self,
+        original_plan: dict,
+        selected_activities: List[dict],
+        modification_instruction: str,
+    ) -> str:
+        # Format selected activities
+        selected_activities_formatted = "\n".join(
+            [
+                f"- Date: {act['date']}, Time: {act['time']}~{act['end_time']}, "
+                f"Activity: {act['activity']}"
+                for act in selected_activities
+            ]
+        )
+
+        # Get user preferences from config
+        travel_style = ", ".join(self.config.travel_prefs.travel_style)
+        transportation = self.config.travel_prefs.transportation
+        interests = ", ".join(self.config.travel_prefs.interests)
+        dietary = ", ".join(self.config.travel_prefs.dietary)
+
+        # Budget information
+        total_budget = self.config.total_budget
+        remaining_budget = total_budget - (
+            self.config.flight_prefs.budget + self.config.hotel_prefs.budget
+        )
+        currency = self.config.currency
+
+        # Hotel preferences
+        hotel_stars = self.config.hotel_prefs.stars
+        hotel_features = ", ".join(self.config.hotel_prefs.features)
+        hotel_types = ", ".join(self.config.hotel_prefs.types)
+
+        return f"""
+        Please help modify the itinerary based on the following requirements:
+
+        Original Activities to Modify:
+        {selected_activities_formatted}
+
+        Modification Request:
+        {modification_instruction}
+
+        Current Itinerary:
+        {json.dumps(original_plan, indent=2)}
+
+        User Preferences and Constraints:
+        1. Budget Constraints:
+           - Total Budget: {total_budget} {currency}
+           - Remaining Budget: {remaining_budget} {currency}
+           
+        2. Travel Style and Preferences:
+           - Travel Style: {travel_style}
+           - Transportation: {transportation}
+           - Interests: {interests}
+           - Dietary Requirements: {dietary}
+           
+        3. Hotel Preferences:
+           - Star Rating: {hotel_stars}
+           - Required Amenities: {hotel_features}
+           - Accommodation Types: {hotel_types}
+
+        Modification Requirements:
+        1. Maintain the original JSON format
+        2. Only modify selected activities while keeping others unchanged
+        3. Ensure modifications comply with:
+           - Budget constraints
+           - Time constraints (no overlapping)
+           - Geographic feasibility (consider travel time)
+           - Operating hours
+           - Weather conditions (for outdoor activities)
+        4. New activities must align with user preferences:
+           - Match travel style
+           - Consider transportation preferences
+           - Align with interests
+           - Respect dietary requirements
+        5. For restaurant modifications:
+           - Ensure dietary compliance
+           - Consider appropriate meal times
+        6. For attraction modifications:
+           - Verify operating hours
+           - Consider weather impact (outdoor activities)
+           - Assess transportation feasibility
+
+        Please use the following tools to assist with modifications:
+        - search_activities: Find suitable new activities
+        - get_travel_time: Verify travel time between locations
+        - check_opening_hours: Confirm operating hours
+        - get_weather: Check weather conditions (outdoor activities)
+        - format_itinerary: Format the final itinerary
+
+        Please return the complete modified itinerary in JSON format.
+        """
+
+    def modify_itinerary(
+        self,
+        original_plan: dict,
+        selected_activities: List[dict],
+        modification_instruction: str,
+        history: ItineraryHistory,
+    ) -> dict:
+        # Prepare prompt
+        prompt = self._generate_modification_prompt(
+            original_plan, selected_activities, modification_instruction
+        )
+
+        # Create progress indicators
+        progress_bar = st.progress(0)
+        progress_text = st.empty()
+
+        # Create an expander for agent's thought process
+        thought_block = st.expander("🤔 Agent's Thought Process", expanded=True)
+
+        try:
+            # Initialize tool call counter and thoughts list
+            tool_call_count = 0
+            thoughts = []
+
+            # Process agent's response
+            with thought_block:
+                st.markdown("### 🔄 Modification Process")
+                raw_content = None
+
+                for event in self.agent.stream(
+                    {"messages": [{"role": "user", "content": prompt}]}
+                ):
+                    if "agent" in event:
+                        for message in event["agent"]["messages"]:
+                            # Handle tool calls
+                            if hasattr(message, "additional_kwargs"):
+                                tool_calls = getattr(
+                                    message, "additional_kwargs", {}
+                                ).get("tool_calls", [])
+
+                                for tool_call in tool_calls:
+                                    tool_name = tool_call["function"]["name"]
+                                    tool_args = tool_call["function"]["arguments"]
+                                    emoji = self.emoji_map.get(tool_name, "🔧")
+
+                                    # Add thought process
+                                    thought = {
+                                        "type": "tool_call",
+                                        "tool": tool_name,
+                                        "args": tool_args,
+                                        "emoji": emoji,
+                                    }
+                                    thoughts.append(thought)
+
+                                    st.markdown(f"#### {emoji} Using {tool_name}")
+                                    st.code(tool_args, language="json")
+
+                                    # Update progress
+                                    tool_call_count += 1
+                                    progress = min(
+                                        tool_call_count / (tool_call_count + 1), 1.0
+                                    )
+                                    progress_bar.progress(progress)
+
+                            # Handle agent's reasoning
+                            if hasattr(message, "content") and message.content:
+                                if (
+                                    "I need to" in message.content
+                                    or "I should" in message.content
+                                ):
+                                    st.markdown(f"💭 **Agent's Reasoning:**")
+                                    st.markdown(message.content)
+                                    thoughts.append(
+                                        {
+                                            "type": "reasoning",
+                                            "content": message.content,
+                                        }
+                                    )
+
+                            # Handle final result
+                            if hasattr(message, "content") and message.content:
+                                raw_content = message.content
+                                progress_bar.progress(1.0)
+                                progress_text.text("✅ Modification complete! 🎉")
+
+                # Display summary of modifications
+                if raw_content:
+                    st.markdown("### 📝 Modification Summary")
+                    st.markdown("The agent followed these steps:")
+
+                    for i, thought in enumerate(thoughts, 1):
+                        if thought["type"] == "tool_call":
+                            st.markdown(
+                                f"{i}. {thought['emoji']} Used `{thought['tool']}` to find suitable options"
+                            )
+                        elif thought["type"] == "reasoning":
+                            st.markdown(f"{i}. 💭 Reasoning: {thought['content']}")
+
+                    # Save thoughts to history
+                    history.add_modification_thoughts(thoughts)
+
+                    # Extract JSON from the raw content
+                    cleaned = re.search(r"```json(.*?)```", raw_content, re.DOTALL)
+                    modified_plan = (
+                        json.loads(cleaned.group(1).strip())
+                        if cleaned
+                        else json.loads(raw_content.strip())
+                    )
+                    return modified_plan
+                else:
+                    raise Exception("No content received from agent")
+
+        except Exception as e:
+            st.error(f"Error modifying itinerary: {str(e)}")
+            return original_plan
+        finally:
+            # Ensure progress bar is completed
+            progress_bar.progress(1.0)
+
+
 class TravelUI:
     def __init__(self):
         self.config = None
@@ -283,9 +522,15 @@ class TravelUI:
         self.history = ItineraryHistory()
         self.chat_history = ChatHistory()
 
+    def update_config(self):
+        """Update the current configuration from UI inputs"""
+        self.config = self.get_current_config()
+
     def setup_page(self):
         st.set_page_config(page_title="Travel Buddy", page_icon="✈️", layout="wide")
         self._setup_styles()
+        # Initialize or update config
+        self.update_config()
 
     def _setup_styles(self):
         background_image_url = "https://c1.wallpaperflare.com/preview/447/58/538/cloudscape-texture-cloud-sky-thumbnail.jpg"
@@ -703,34 +948,46 @@ class TravelUI:
                     st.session_state.selected_plan
                 ]
 
-                # Display chat history with containers
-                for msg in self.chat_history.get_messages():
-                    with st.container():
-                        with st.chat_message(msg.role):
-                            st.markdown(msg.content, unsafe_allow_html=True)
+                # Display all messages in chat history
+                messages = self.chat_history.get_messages()
+                for i, msg in enumerate(messages):
+                    # Display the message
+                    with st.chat_message(msg.role):
+                        st.markdown(msg.content, unsafe_allow_html=True)
 
-                        # If this is the most recent message and it's from the assistant,
-                        # show the modification UI right after it
-                        if (
-                            msg == self.chat_history.get_messages()[-1]
-                            and msg.role == "assistant"
-                        ):
-                            with st.container():
-                                st.markdown("### 🔄 Want to modify this itinerary?")
-                                selected_activities, modification_instruction = (
-                                    self.display_modification_ui(
-                                        current_plan, current_date=None
+                    # If this is an assistant message and there are thoughts for this modification
+                    if msg.role == "assistant" and i // 2 < len(
+                        self.history.get_all_thoughts()
+                    ):
+                        thoughts = self.history.get_all_thoughts()[i // 2]
+                        # Display the modification thoughts
+                        with st.expander("🤔 Agent's Thought Process", expanded=True):
+                            st.markdown("### 📝 Modification Steps")
+                            for j, thought in enumerate(thoughts, 1):
+                                if thought["type"] == "tool_call":
+                                    st.markdown(
+                                        f"{j}. {thought['emoji']} Used `{thought['tool']}` to find suitable options"
                                     )
-                                )
+                                    st.code(thought["args"], language="json")
+                                elif thought["type"] == "reasoning":
+                                    st.markdown(
+                                        f"{j}. 💭 Reasoning: {thought['content']}"
+                                    )
 
-                                # Handle modification if user submitted
-                                if selected_activities and modification_instruction:
-                                    modified_plan = self.handle_modification_result(
-                                        current_plan,
-                                        selected_activities,
-                                        modification_instruction,
-                                    )
-                                    st.rerun()
+                # Display current modification UI
+                st.markdown("### 🔄 Want to modify this itinerary?")
+                selected_activities, modification_instruction = (
+                    self.display_modification_ui(current_plan, current_date=None)
+                )
+
+                # Handle modification if user submitted
+                if selected_activities and modification_instruction:
+                    modified_plan = self.handle_modification_result(
+                        current_plan,
+                        selected_activities,
+                        modification_instruction,
+                    )
+                    st.rerun()
 
     def display_modification_ui(self, plan, current_date):
         """Display the modification UI for the itinerary"""
@@ -1033,10 +1290,6 @@ class TravelUI:
     def handle_modification_result(
         self, plan, selected_activities, modification_instruction
     ):
-        """Handle the modification result and update the plan"""
-        if not selected_activities or not modification_instruction:
-            return plan
-
         with st.spinner("🤔 Thinking about your modification request..."):
             try:
                 # Add user's request to chat history
@@ -1053,9 +1306,10 @@ class TravelUI:
 
                 self.chat_history.add_message("user", user_message)
 
-                # Get mock modified itinerary
-                modified_plan = get_mock_modified_itinerary(
-                    plan, selected_activities, modification_instruction
+                # Create modification agent and modify itinerary
+                modifier = ModifyItineraryAgent(self.config)
+                modified_plan = modifier.modify_itinerary(
+                    plan, selected_activities, modification_instruction, self.history
                 )
 
                 # Add modified itinerary to chat history
@@ -1080,7 +1334,7 @@ class TravelUI:
                 return modified_plan
 
             except Exception as e:
-                error_message = f"❌ I encountered an error while trying to modify the itinerary: {str(e)}"
+                error_message = f"❌ Error modifying itinerary: {str(e)}"
                 st.error(error_message)
                 self.chat_history.add_message("assistant", error_message)
                 return plan
@@ -1238,10 +1492,10 @@ class TravelUI:
         """Standardize time string to 24-hour format (HH:MM)
 
         Args:
-                time_str (str): Time string in various formats
+            time_str (str): Time string in various formats (e.g. "5:00 PM", "5 PM", "17:00", "08:00")
 
         Returns:
-                str: Standardized time string in HH:MM format
+            str: Standardized time string in HH:MM format
         """
         try:
             # Remove extra spaces and handle special cases
@@ -1249,32 +1503,35 @@ class TravelUI:
             if time_str == "(End)":
                 return "23:59"
 
-            # Remove any extra spaces between numbers and AM/PM
-            time_str = time_str.replace(" AM", "AM").replace(" PM", "PM")
-            time_str = time_str.replace("AM ", "AM").replace("PM ", "PM")
+            # If already in 24-hour format (HH:MM), return as is
+            if re.match(r"^([01][0-9]|2[0-3]):[0-5][0-9]$", time_str):
+                return time_str
 
-            # Handle cases like "1: 00 PM" or "1:00PM"
+            # Remove all spaces from the string
+            time_str = "".join(time_str.split())
+
+            # Convert to uppercase for consistency
+            time_str = time_str.upper()
+
+            # Handle cases with colon
             if ":" in time_str:
-                # Split by colon and clean up spaces
-                hour_part, minute_part = time_str.split(":")
-                hour_part = hour_part.strip()
-                # Extract minutes and meridiem
-                minute_match = re.match(r"\s*(\d+)\s*(AM|PM)?", minute_part.upper())
-                if minute_match:
-                    minutes = int(minute_match.group(1))
-                    meridiem = minute_match.group(2)
-            else:
-                # Handle cases without colon
-                match = re.match(r"\s*(\d+)\s*(AM|PM)?", time_str.upper())
+                # Split time into hours and minutes with AM/PM
+                match = re.match(r"(\d+):(\d+)(AM|PM)?", time_str)
                 if match:
-                    hour_part = match.group(1)
+                    hours = int(match.group(1))
+                    minutes = int(match.group(2))
+                    meridiem = match.group(3)
+                else:
+                    raise ValueError(f"Invalid time format: {time_str}")
+            else:
+                # Handle cases without colon (e.g. "5PM")
+                match = re.match(r"(\d+)(AM|PM)?", time_str)
+                if match:
+                    hours = int(match.group(1))
                     minutes = 0
                     meridiem = match.group(2)
                 else:
-                    return time_str
-
-            # Convert hour to int
-            hours = int(hour_part)
+                    raise ValueError(f"Invalid time format: {time_str}")
 
             # Convert to 24-hour format if AM/PM is present
             if meridiem:
@@ -1290,7 +1547,7 @@ class TravelUI:
             # Format the time
             return f"{hours:02d}:{minutes:02d}"
         except Exception as e:
-            print(f"Error processing time {time_str}: {str(e)}")
+            print(f"Error formatting time {time_str}: {str(e)}")
             return time_str
 
     def format_time_range(self, time_str):
@@ -1300,7 +1557,7 @@ class TravelUI:
             time_str (str): Time string in HH:MM format (24-hour)
 
         Returns:
-            str: Formatted time string in HH:MM AM/PM format
+            str: Formatted time string in HH:MM format (24-hour)
         """
         try:
             if time_str == "(End)":
@@ -1309,16 +1566,9 @@ class TravelUI:
             if ":" not in time_str:
                 return time_str
 
-            hours, minutes = map(int, time_str.split(":"))
-            period = "AM" if hours < 12 else "PM"
+            # Return the time string as is since we're using 24-hour format
+            return time_str
 
-            # Convert to 12-hour format
-            if hours == 0:
-                hours = 12
-            elif hours > 12:
-                hours = hours - 12
-
-            return f"{hours:02d}:{minutes:02d} {period}"
         except Exception as e:
             print(f"Error formatting time {time_str}: {str(e)}")
             return time_str

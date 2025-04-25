@@ -1,9 +1,12 @@
 from config import settings
 from langgraph.prebuilt import create_react_agent
 from tools import (
+    check_opening_hours,
     format_itinerary,
+    get_travel_time,
     get_weather,
     modify_itinerary,
+    search_activities,
     search_and_generate_itinerary,
     search_flight,
     search_hotel,
@@ -41,8 +44,10 @@ def create_modify_itinerary_agent():
         Agent: A ReAct agent with tools for modifying itineraries
     """
     tools = [
-        modify_itinerary,
-        search_and_generate_itinerary,
+        search_activities,
+        get_travel_time,
+        check_opening_hours,
+        get_weather,
         format_itinerary,
     ]
 

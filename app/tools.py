@@ -333,3 +333,101 @@ def modify_itinerary(
 
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
+
+@tool
+def search_activities(
+    location: str,
+    interests: List[str],
+    budget: float,
+    time_slot: str,
+    weather: str = None,
+    indoor_only: bool = False,
+) -> List[Dict]:
+    """
+    🎯 Search for activities in a specific location based on user preferences.
+
+    Args:
+        location (str): The location to search for activities
+        interests (List[str]): List of user interests
+        budget (float): Available budget for the activity
+        time_slot (str): Preferred time slot (morning/afternoon/evening)
+        weather (str, optional): Weather condition to consider
+        indoor_only (bool, optional): Whether to only show indoor activities
+
+    Returns:
+        List[Dict]: List of activity suggestions with details
+    """
+    try:
+        query = f"""
+        Find activities in {location} that match:
+        - Interests: {', '.join(interests)}
+        - Budget: {budget}
+        - Time: {time_slot}
+        - Weather: {weather if weather else 'Any'}
+        - {'Indoor activities only' if indoor_only else 'Both indoor and outdoor activities'}
+        """
+
+        return get_response_from_ai_service(query)
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+
+@tool
+def get_travel_time(
+    origin: str,
+    destination: str,
+    mode: str = "transit",
+    departure_time: str = None,
+) -> Dict:
+    """
+    🚗 Get estimated travel time between two locations.
+
+    Args:
+        origin (str): Starting location
+        destination (str): Ending location
+        mode (str): Transportation mode (transit/walking/driving)
+        departure_time (str, optional): Departure time in HH:MM format
+
+    Returns:
+        Dict: Travel time details including duration and route options
+    """
+    try:
+        query = f"""
+        Calculate travel time from {origin} to {destination}:
+        - Mode: {mode}
+        - Departure: {departure_time if departure_time else 'Now'}
+        """
+
+        return get_response_from_ai_service(query)
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+
+@tool
+def check_opening_hours(
+    place_name: str,
+    date: str,
+    location: str = None,
+) -> Dict:
+    """
+    ⏰ Check the opening hours for a specific place.
+
+    Args:
+        place_name (str): Name of the place
+        date (str): Date to check in YYYY-MM-DD format
+        location (str, optional): Location details for disambiguation
+
+    Returns:
+        Dict: Opening hours information including special holiday schedules
+    """
+    try:
+        query = f"""
+        Check opening hours for {place_name}:
+        - Date: {date}
+        {f'- Location: {location}' if location else ''}
+        """
+
+        return get_response_from_ai_service(query)
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
