@@ -567,9 +567,9 @@ class TravelUI:
             }}
             .footer {{
                 position: fixed;
-                left: 0;
+                right: 0;
                 bottom: 0;
-                width: 100%;
+                width: calc(100% - 500px);
                 text-align: center;
                 padding: 20px;
                 background-color: white;
