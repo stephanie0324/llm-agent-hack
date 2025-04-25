@@ -510,6 +510,9 @@ class TravelUI:
                 )
 
     def render_itinerary_card(self, plan):
+        # Format average per day to remove trailing zeros while keeping the thousands separator
+        avg_per_day = f"{plan['avg_per_day']:,.3f}".rstrip("0").rstrip(".")
+
         return f"""
         <div style="
             border: 2px solid #1E90FF;
@@ -536,7 +539,7 @@ class TravelUI:
                 <strong>Estimated Total Cost:</strong> NT$ {plan['total_cost']:,}
             </p>
             <p style="text-align: left; font-size: 16px;">
-                <strong>Average Per Day:</strong> NT$ {plan['avg_per_day']:,}
+                <strong>Average Per Day:</strong> NT$ {avg_per_day}
             </p>
         </div>
         """
@@ -664,11 +667,90 @@ class TravelUI:
         """Display itinerary in chat format with table schedule"""
         message = f"""
 <div style="padding: 25px; border-radius: 12px; border: 2px solid #1E90FF; margin: 15px 0; background-color: #ffffff; box-shadow: 0 2px 8px rgba(30, 144, 255, 0.1);">
+<head>
+    <style type="text/css">
+        .schedule-table td {{
+            transition: all 0.3s ease;
+            position: relative;
+        }}
+
+        .schedule-table td[data-activity]:hover {{
+            background-color: #2196F3 !important;
+            color: white !important;
+            transform: scale(1.02);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            cursor: pointer;
+            z-index: 2;
+        }}
+
+        #activity-details {{
+            display: none;
+            position: fixed;
+            background: white;
+            border: 2px solid #1E90FF;
+            border-radius: 8px;
+            padding: 15px;
+            max-width: 300px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+        }}
+    </style>
+</head>
+
+<div id="activity-details"></div>
+
+<script type="text/javascript">
+    document.addEventListener('DOMContentLoaded', function() {{
+        const setupEventListeners = function() {{
+            document.querySelectorAll('.schedule-table td[data-activity]').forEach(cell => {{
+                cell.addEventListener('click', function(e) {{
+                    const details = document.getElementById('activity-details');
+                    if (details) {{
+                        details.innerHTML = `
+                            <h4 style="margin: 0 0 10px 0; color: #1E90FF;">🎯 活動詳情</h4>
+                            <p style="margin: 5px 0;"><strong>活動：</strong>${{this.dataset.activity}}</p>
+                            <p style="margin: 5px 0;"><strong>時間：</strong>${{this.dataset.time}}</p>
+                            <p style="margin: 5px 0;"><strong>描述：</strong>${{this.dataset.description}}</p>
+                        `;
+                        
+                        const rect = this.getBoundingClientRect();
+                        details.style.left = rect.left + window.scrollX + 'px';
+                        details.style.top = rect.bottom + window.scrollY + 10 + 'px';
+                        details.style.display = 'block';
+                        
+                        e.stopPropagation();
+                    }}
+                }});
+            }});
+            
+            document.addEventListener('click', function(e) {{
+                const details = document.getElementById('activity-details');
+                if (details && !details.contains(e.target)) {{
+                    details.style.display = 'none';
+                }}
+            }});
+        }};
+
+        // 初始設置
+        setupEventListeners();
+
+        // 監聽可能的動態內容更新
+        const observer = new MutationObserver(function(mutations) {{
+            setupEventListeners();
+        }});
+
+        observer.observe(document.body, {{
+            childList: true,
+            subtree: true
+        }});
+    }});
+</script>
+
 <h1 style="font-size: 32px; color: #1E90FF; text-align: center; margin-bottom: 30px;">✨ {plan['title']}</h1>
 
 💰 **Cost Summary**:
 - Total Cost: NT$ {plan['total_cost']:,}
-- Average Per Day: NT$ {plan['avg_per_day']:,}
+- Average Per Day: NT$ {plan['avg_per_day']:,.3f}
 
 🌟 **Highlights**:
 {chr(10).join([f"- {highlight}" for highlight in plan['highlights']])}
@@ -677,8 +759,8 @@ class TravelUI:
 
 <div style="max-height: 500px; overflow-y: auto; overflow-x: auto; margin: 10px 0;">
 <div style="min-width: 800px;">
-<table style="width: 100%; border-collapse: collapse; text-align: center; position: relative; font-family: Arial, sans-serif;">
-<thead style="position: sticky; top: 0; background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 1;">
+<table class="schedule-table" style="width: 100%; border-collapse: collapse; text-align: center; position: relative; font-family: Arial, sans-serif;">
+<thead style="position: sticky; top: 0; background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 2;">
 <tr>
 <th style="border: 1px solid #ddd; padding: 12px; min-width: 80px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">Time</th>
 """
@@ -711,28 +793,21 @@ class TravelUI:
             for minute in [0, 30]:
                 time_slots.append(f"{hour:02d}:{minute:02d}")
 
-        # Create a dictionary to store activities by date and time, with duration
+        # Create a dictionary to store activities by date and time
         activities_by_date = {date: {} for date in dates}
         for day in plan["details"]:
             date = day["date"]
             schedule = day["schedule"]
-            for i, (time, activity) in enumerate(schedule):
-                start_time = self.standardize_time_format(time)
-                # Calculate end time based on next activity
-                if i < len(schedule) - 1:
-                    end_time = self.standardize_time_format(schedule[i + 1][0])
-                else:
-                    # If it's the last activity, assume it lasts 2 hours
-                    hour, minute = map(int, start_time.split(":"))
-                    hour = (hour + 2) % 24
-                    end_time = f"{hour:02d}:{minute:02d}"
-
+            for activity in schedule:
+                start_time = self.standardize_time_format(activity["start_time"])
+                end_time = self.standardize_time_format(activity["end_time"])
                 activities_by_date[date][start_time] = {
-                    "activity": activity,
+                    "activity": activity["activity"],
                     "end_time": end_time,
+                    "description": activity.get("description", ""),
                 }
 
-        # Calculate rowspans for each activity
+        # Calculate rowspans
         rowspans = {date: {} for date in dates}
         for date in dates:
             for start_time, activity_info in activities_by_date[date].items():
@@ -769,11 +844,13 @@ class TravelUI:
 
                 current_activity = None
                 rowspan = 1
+                description = ""
 
                 # Check if there's an activity starting at this time
                 if time_slot in activities_by_date[date]:
                     activity_info = activities_by_date[date][time_slot]
                     current_activity = activity_info["activity"]
+                    description = activity_info["description"]
                     if time_slot in rowspans[date]:
                         rowspan = rowspans[date][time_slot]
                         # Mark cells to skip
@@ -787,11 +864,18 @@ class TravelUI:
                     cell_style += (
                         " background-color: #ebf5ff; color: #2c3e50; font-weight: 500;"
                     )
+                    # Format time for display
+                    display_time = f"{self.format_time_range(time_slot)} ~ {self.format_time_range(activity_info['end_time'])}"
+
+                    # Add data attributes for the popup
+                    data_attrs = f'data-activity="{current_activity}" data-time="{display_time}" data-description="{description}"'
+                else:
+                    data_attrs = ""
 
                 if rowspan > 1:
-                    message += f'<td style="{cell_style}" rowspan="{rowspan}">{current_activity or ""}</td>'
+                    message += f'<td {data_attrs} style="{cell_style}" rowspan="{rowspan}">{current_activity or ""}</td>'
                 else:
-                    message += f'<td style="{cell_style}">{current_activity or ""}</td>'
+                    message += f'<td {data_attrs} style="{cell_style}">{current_activity or ""}</td>'
 
             message += "</tr>"
 
@@ -829,7 +913,7 @@ class TravelUI:
                     "I would like to modify these activities:\n"
                     + "\n".join(
                         [
-                            f"- {act['activity']} on {act['date']}"
+                            f"- {act['date']} {self.format_time_range(act['time'])}~{self.format_time_range(act['end_time'])} {act['activity']}"
                             for act in selected_activities
                         ]
                     )
@@ -913,13 +997,16 @@ class TravelUI:
         """
         selected_activities = []
 
+        # Format average per day to remove trailing zeros while keeping the thousands separator
+        avg_per_day = f"{plan['avg_per_day']:,.3f}".rstrip("0").rstrip(".")
+
         # Display plan title and cost summary
         st.markdown(f"### ✨ {plan['title']}")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"**Total Cost:** NT$ {plan['total_cost']:,}")
         with col2:
-            st.markdown(f"**Average Per Day:** NT$ {plan['avg_per_day']:,}")
+            st.markdown(f"**Average Per Day:** NT$ {avg_per_day}")
 
         st.markdown("---")
 
@@ -928,52 +1015,51 @@ class TravelUI:
             with st.expander(f"📅 Date {day_schedule['date']}", expanded=True):
                 # Create activities list
                 activities = []
-                for i, (start_time, item) in enumerate(day_schedule["schedule"]):
-                    # Determine end time (except for last item)
-                    if i + 1 < len(day_schedule["schedule"]):
-                        end_time = self.standardize_time_format(
-                            day_schedule["schedule"][i + 1][0]
-                        )
-                        time_range = f"{self.format_time_range(self.standardize_time_format(start_time))} ~ {self.format_time_range(end_time)}"
-                    else:
-                        time_range = f"{self.format_time_range(self.standardize_time_format(start_time))} ~ (End)"
-
-                    # Match emoji
+                for activity in day_schedule["schedule"]:
+                    # Match emoji based on activity type
                     if any(
-                        keyword in item.lower()
+                        keyword in activity["activity"].lower()
                         for keyword in ["breakfast", "lunch", "dinner"]
                     ):
                         emoji = "🍽️"
                     elif any(
-                        keyword in item.lower() for keyword in ["check-in", "check out"]
+                        keyword in activity["activity"].lower()
+                        for keyword in ["check-in", "check out"]
                     ):
                         emoji = "🛏️"
                     elif any(
-                        keyword in item.lower() for keyword in ["airport", "flight"]
+                        keyword in activity["activity"].lower()
+                        for keyword in ["airport", "flight"]
                     ):
                         emoji = "✈️"
                     elif any(
-                        keyword in item.lower()
+                        keyword in activity["activity"].lower()
                         for keyword in ["museum", "temple", "shrine", "art", "tour"]
                     ):
                         emoji = "🏛️"
                     elif any(
-                        keyword in item.lower() for keyword in ["shopping", "market"]
+                        keyword in activity["activity"].lower()
+                        for keyword in ["shopping", "market"]
                     ):
                         emoji = "💼️"
                     elif any(
-                        keyword in item.lower() for keyword in ["onsen", "relax", "spa"]
+                        keyword in activity["activity"].lower()
+                        for keyword in ["onsen", "relax", "spa"]
                     ):
                         emoji = "♨️"
                     else:
                         emoji = "⏰"
 
+                    time_range = f"{self.format_time_range(activity['start_time'])} ~ {self.format_time_range(activity['end_time'])}"
+
                     activities.append(
                         {
                             "time_range": time_range,
-                            "activity": f"{emoji} {item}",
-                            "raw_activity": item,
-                            "time": start_time,
+                            "activity": f"{emoji} {activity['activity']}",
+                            "raw_activity": activity["activity"],
+                            "time": activity["start_time"],
+                            "end_time": activity["end_time"],
+                            "description": activity.get("description", ""),
                         }
                     )
 
@@ -985,6 +1071,8 @@ class TravelUI:
                             st.markdown(
                                 f"**{activity['time_range']}**: {activity['activity']}"
                             )
+                            if activity["description"]:
+                                st.markdown(f"*{activity['description']}*")
                         with cols[1]:
                             checkbox_key = f"{key_prefix}_mod_{day_schedule['date']}_{activity['raw_activity']}"
 
@@ -1002,6 +1090,7 @@ class TravelUI:
                                     {
                                         "date": day_schedule["date"],
                                         "time": activity["time"],
+                                        "end_time": activity["end_time"],
                                         "activity": activity["raw_activity"],
                                     }
                                 )
@@ -1009,6 +1098,8 @@ class TravelUI:
                         st.markdown(
                             f"**{activity['time_range']}**: {activity['activity']}"
                         )
+                        if activity["description"]:
+                            st.markdown(f"*{activity['description']}*")
 
         return selected_activities
 
@@ -1072,13 +1163,13 @@ class TravelUI:
             return time_str
 
     def format_time_range(self, time_str):
-        """Format time range for display
+        """Format time range for display in 12-hour format with AM/PM
 
         Args:
-            time_str (str): Time string in HH:MM format
+            time_str (str): Time string in HH:MM format (24-hour)
 
         Returns:
-            str: Formatted time string in HH:MM format
+            str: Formatted time string in HH:MM AM/PM format
         """
         try:
             if time_str == "(End)":
@@ -1088,7 +1179,15 @@ class TravelUI:
                 return time_str
 
             hours, minutes = map(int, time_str.split(":"))
-            return f"{hours:02d}:{minutes:02d}"
+            period = "AM" if hours < 12 else "PM"
+
+            # Convert to 12-hour format
+            if hours == 0:
+                hours = 12
+            elif hours > 12:
+                hours = hours - 12
+
+            return f"{hours:02d}:{minutes:02d} {period}"
         except Exception as e:
             print(f"Error formatting time {time_str}: {str(e)}")
             return time_str

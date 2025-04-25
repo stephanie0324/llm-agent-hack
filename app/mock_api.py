@@ -5,7 +5,7 @@ from typing import List, TypedDict
 
 class DaySchedule(TypedDict):
     day: int
-    schedule: List[tuple[str, str]]
+    schedule: List[dict]
 
 
 class ItineraryPlan(TypedDict):
@@ -63,36 +63,108 @@ def get_mock_itineraries() -> List[ItineraryPlan]:
                 {
                     "date": "2025-04-24",
                     "schedule": [
-                        ["8: 00 AM", "Breakfast at Aman Tokyo Café"],
-                        ["10: 00 AM", "Visit Senso-ji Temple and Nakamise Street"],
-                        ["1: 00 PM", "Lunch at Sukiyabashi Jiro"],
-                        ["3: 00 PM", "Stroll through Sumida Park"],
-                        ["7: 00 PM", "Dinner at Ishikawa"],
+                        {
+                            "start_time": "8: 00 AM",
+                            "end_time": "10: 00 AM",
+                            "activity": "Breakfast at Aman Tokyo Café",
+                            "description": "Breakfast at Aman Tokyo Café...",
+                        },
+                        {
+                            "start_time": "10: 00 AM",
+                            "end_time": "12: 00 PM",
+                            "activity": "Visit Senso-ji Temple and Nakamise Street",
+                            "description": "Visit Senso-ji Temple and Nakamise Street...",
+                        },
+                        {
+                            "start_time": "1: 00 PM",
+                            "end_time": "3: 00 PM",
+                            "activity": "Lunch at Sukiyabashi Jiro",
+                            "description": "Experience world-famous sushi at Sukiyabashi Jiro...",
+                        },
+                        {
+                            "start_time": "3: 00 PM",
+                            "end_time": "5: 00 PM",
+                            "activity": "Stroll through Sumida Park",
+                            "description": "Enjoy a peaceful walk through the beautiful Sumida Park...",
+                        },
+                        {
+                            "start_time": "7: 00 PM",
+                            "end_time": "9: 00 PM",
+                            "activity": "Dinner at Ishikawa",
+                            "description": "Savor traditional Japanese kaiseki at the prestigious Ishikawa...",
+                        },
                     ],
                     "hotel": {"name": "The Ritz-Carlton Tokyo"},
                 },
                 {
                     "date": "2025-04-25",
                     "schedule": [
-                        ["8: 30 AM", "Breakfast at Bills Omotesando"],
-                        ["10: 00 AM", "Relax at Shinjuku Gyoen National Garden"],
-                        ["1: 00 PM", "Lunch at Narisawa"],
-                        ["3: 00 PM", "Explore Meiji Shrine"],
-                        ["7: 00 PM", "Dinner at Ginza Ukai Tei"],
+                        {
+                            "start_time": "8: 30 AM",
+                            "end_time": "10: 00 AM",
+                            "activity": "Breakfast at Bills Omotesando",
+                            "description": "Start your day with famous ricotta pancakes at Bills...",
+                        },
+                        {
+                            "start_time": "10: 00 AM",
+                            "end_time": "12: 30 PM",
+                            "activity": "Relax at Shinjuku Gyoen National Garden",
+                            "description": "Explore one of Tokyo's largest and most beautiful gardens...",
+                        },
+                        {
+                            "start_time": "1: 00 PM",
+                            "end_time": "3: 00 PM",
+                            "activity": "Lunch at Narisawa",
+                            "description": "Experience innovative Japanese cuisine at this acclaimed restaurant...",
+                        },
+                        {
+                            "start_time": "3: 00 PM",
+                            "end_time": "5: 00 PM",
+                            "activity": "Explore Meiji Shrine",
+                            "description": "Visit Tokyo's most important Shinto shrine surrounded by forest...",
+                        },
+                        {
+                            "start_time": "7: 00 PM",
+                            "end_time": "9: 00 PM",
+                            "activity": "Dinner at Ginza Ukai Tei",
+                            "description": "Enjoy premium teppanyaki in an elegant setting...",
+                        },
                     ],
                     "hotel": {"name": "The Ritz-Carlton Tokyo"},
                 },
                 {
                     "date": "2025-04-26",
                     "schedule": [
-                        ["8: 30 AM", "Breakfast at Café de l'Ambre"],
-                        ["10: 00 AM", "Day trip to Odaiba"],
-                        ["12: 30 PM", "Lunch at Kua Aina"],
-                        ["2: 30 PM", "Relax at Oedo-Onsen Monogatari"],
-                        [
-                            "7: 00 PM",
-                            "Dinner at The Peninsula Tokyo's Peter Restaurant",
-                        ],
+                        {
+                            "start_time": "8: 30 AM",
+                            "end_time": "10: 00 AM",
+                            "activity": "Breakfast at Café de l'Ambre",
+                            "description": "Experience one of Tokyo's oldest and most respected coffee shops...",
+                        },
+                        {
+                            "start_time": "10: 00 AM",
+                            "end_time": "12: 30 PM",
+                            "activity": "Day trip to Odaiba",
+                            "description": "Explore the futuristic artificial island with shopping and entertainment...",
+                        },
+                        {
+                            "start_time": "12: 30 PM",
+                            "end_time": "2: 30 PM",
+                            "activity": "Lunch at Kua Aina",
+                            "description": "Enjoy gourmet burgers with a view of Tokyo Bay...",
+                        },
+                        {
+                            "start_time": "2: 30 PM",
+                            "end_time": "4: 30 PM",
+                            "activity": "Relax at Oedo-Onsen Monogatari",
+                            "description": "Experience a traditional Japanese hot spring theme park...",
+                        },
+                        {
+                            "start_time": "7: 00 PM",
+                            "end_time": "9: 00 PM",
+                            "activity": "Dinner at The Peninsula Tokyo's Peter Restaurant",
+                            "description": "Dine with spectacular views of the Imperial Palace and Tokyo skyline...",
+                        },
                     ],
                     "hotel": {"name": "The Ritz-Carlton Tokyo"},
                 },
@@ -140,32 +212,102 @@ def get_mock_itineraries() -> List[ItineraryPlan]:
                 {
                     "date": "2025-04-24",
                     "schedule": [
-                        ["8: 00 AM", "Breakfast at Le Pain Quotidien Shibuya"],
-                        ["10: 00 AM", "Explore Tsukiji Outer Market"],
-                        ["12: 30 PM", "Lunch at Sushi Dai"],
-                        ["3: 00 PM", "Visit Tokyo Tower"],
-                        ["7: 00 PM", "Dinner at Seryna Honten"],
+                        {
+                            "start_time": "8: 00 AM",
+                            "end_time": "10: 00 AM",
+                            "activity": "Breakfast at Le Pain Quotidien Shibuya",
+                            "description": "Start your day with fresh pastries and organic coffee...",
+                        },
+                        {
+                            "start_time": "10: 00 AM",
+                            "end_time": "12: 00 PM",
+                            "activity": "Explore Tsukiji Outer Market",
+                            "description": "Discover Japan's largest fish market and food street...",
+                        },
+                        {
+                            "start_time": "12: 30 PM",
+                            "end_time": "2: 30 PM",
+                            "activity": "Lunch at Sushi Dai",
+                            "description": "Experience some of Tokyo's finest sushi...",
+                        },
+                        {
+                            "start_time": "3: 00 PM",
+                            "end_time": "5: 00 PM",
+                            "activity": "Visit Tokyo Tower",
+                            "description": "Visit the iconic Tokyo Tower and its observation decks...",
+                        },
+                        {
+                            "start_time": "7: 00 PM",
+                            "end_time": "9: 00 PM",
+                            "activity": "Dinner at Seryna Honten",
+                            "description": "Enjoy premium Kobe beef in the heart of Ginza...",
+                        },
                     ],
                     "hotel": {"name": "Park Hyatt Tokyo"},
                 },
                 {
                     "date": "2025-04-25",
                     "schedule": [
-                        ["8: 30 AM", "Breakfast at Hyatt Regency Tokyo's Café du Parc"],
-                        ["10: 00 AM", "Explore Akihabara"],
-                        ["1: 00 PM", "Lunch at Yakiniku Jumbo Hanare"],
-                        ["4: 00 PM", "Night views at Roppongi Hills Mori Tower"],
-                        ["7: 30 PM", "Dinner at Tempura Kondo"],
+                        {
+                            "start_time": "8: 30 AM",
+                            "end_time": "10: 00 AM",
+                            "activity": "Breakfast at Hyatt Regency Tokyo's Café du Parc",
+                            "description": "Enjoy an elegant breakfast with city views...",
+                        },
+                        {
+                            "start_time": "10: 00 AM",
+                            "end_time": "12: 30 PM",
+                            "activity": "Explore Akihabara",
+                            "description": "Discover Japan's electronics and anime culture center...",
+                        },
+                        {
+                            "start_time": "1: 00 PM",
+                            "end_time": "3: 00 PM",
+                            "activity": "Lunch at Yakiniku Jumbo Hanare",
+                            "description": "Experience premium Japanese BBQ...",
+                        },
+                        {
+                            "start_time": "4: 00 PM",
+                            "end_time": "6: 00 PM",
+                            "activity": "Night views at Roppongi Hills Mori Tower",
+                            "description": "Enjoy panoramic views of Tokyo from the observation deck...",
+                        },
+                        {
+                            "start_time": "7: 30 PM",
+                            "end_time": "9: 30 PM",
+                            "activity": "Dinner at Tempura Kondo",
+                            "description": "Savor exquisite tempura at this Michelin-starred restaurant...",
+                        },
                     ],
                     "hotel": {"name": "Park Hyatt Tokyo"},
                 },
                 {
                     "date": "2025-04-26",
                     "schedule": [
-                        ["8: 30 AM", "Breakfast at Blue Bottle Coffee Kyoto Café"],
-                        ["10: 00 AM", "Visit Tokyo National Museum"],
-                        ["12: 30 PM", "Lunch at Tapas Molecular Bar"],
-                        ["5: 00 PM", "Dinner cruise on yakatabune boat"],
+                        {
+                            "start_time": "8: 30 AM",
+                            "end_time": "10: 00 AM",
+                            "activity": "Breakfast at Blue Bottle Coffee Kyoto Café",
+                            "description": "Start your day with artisanal coffee and pastries...",
+                        },
+                        {
+                            "start_time": "10: 00 AM",
+                            "end_time": "12: 00 PM",
+                            "activity": "Visit Tokyo National Museum",
+                            "description": "Explore Japan's oldest and largest art museum...",
+                        },
+                        {
+                            "start_time": "12: 30 PM",
+                            "end_time": "2: 30 PM",
+                            "activity": "Lunch at Tapas Molecular Bar",
+                            "description": "Experience innovative molecular gastronomy...",
+                        },
+                        {
+                            "start_time": "5: 00 PM",
+                            "end_time": "8: 00 PM",
+                            "activity": "Dinner cruise on yakatabune boat",
+                            "description": "Enjoy traditional Japanese cuisine while cruising Tokyo Bay...",
+                        },
                     ],
                     "hotel": {"name": "Park Hyatt Tokyo"},
                 },
@@ -213,33 +355,108 @@ def get_mock_itineraries() -> List[ItineraryPlan]:
                 {
                     "date": "2025-04-24",
                     "schedule": [
-                        ["8: 00 AM", "Breakfast at Café Kitsuné Aoyama"],
-                        ["10: 00 AM", "Tour Imperial Palace East Gardens"],
-                        ["12: 30 PM", "Lunch at Maisen Omotesando"],
-                        ["3: 00 PM", "Browse Harajuku and Omotesando boutiques"],
-                        ["7: 00 PM", "Dinner at Quintessence"],
+                        {
+                            "start_time": "8: 00 AM",
+                            "end_time": "10: 00 AM",
+                            "activity": "Breakfast at Café Kitsuné Aoyama",
+                            "description": "Start your day at this trendy French-Japanese café...",
+                        },
+                        {
+                            "start_time": "10: 00 AM",
+                            "end_time": "12: 00 PM",
+                            "activity": "Tour Imperial Palace East Gardens",
+                            "description": "Explore the beautiful gardens of Japan's Imperial Palace...",
+                        },
+                        {
+                            "start_time": "12: 30 PM",
+                            "end_time": "2: 30 PM",
+                            "activity": "Lunch at Maisen Omotesando",
+                            "description": "Enjoy Japan's best tonkatsu in a historic setting...",
+                        },
+                        {
+                            "start_time": "3: 00 PM",
+                            "end_time": "5: 00 PM",
+                            "activity": "Browse Harajuku and Omotesando boutiques",
+                            "description": "Explore Tokyo's fashion and design district...",
+                        },
+                        {
+                            "start_time": "7: 00 PM",
+                            "end_time": "9: 00 PM",
+                            "activity": "Dinner at Quintessence",
+                            "description": "Experience French-Japanese fusion at this 3-Michelin starred restaurant...",
+                        },
                     ],
                     "hotel": {"name": "Hotel Chinzanso Tokyo"},
                 },
                 {
                     "date": "2025-04-25",
                     "schedule": [
-                        ["8: 30 AM", "Breakfast at Sarabeth's Shinjuku"],
-                        ["10: 00 AM", "Explore Ryogoku and Sumo Museum"],
-                        ["12: 30 PM", "Lunch at Irokawa (Unagi)"],
-                        ["3: 00 PM", "Stroll through Yanaka Ginza"],
-                        ["7: 30 PM", "Dinner at Ryugin"],
+                        {
+                            "start_time": "8: 30 AM",
+                            "end_time": "10: 00 AM",
+                            "activity": "Breakfast at Sarabeth's Shinjuku",
+                            "description": "Enjoy classic American breakfast with a Japanese twist...",
+                        },
+                        {
+                            "start_time": "10: 00 AM",
+                            "end_time": "12: 30 PM",
+                            "activity": "Explore Ryogoku and Sumo Museum",
+                            "description": "Learn about Japan's national sport in its spiritual home...",
+                        },
+                        {
+                            "start_time": "12: 30 PM",
+                            "end_time": "2: 30 PM",
+                            "activity": "Lunch at Irokawa (Unagi)",
+                            "description": "Savor traditional grilled eel at this century-old restaurant...",
+                        },
+                        {
+                            "start_time": "3: 00 PM",
+                            "end_time": "5: 00 PM",
+                            "activity": "Stroll through Yanaka Ginza",
+                            "description": "Experience the atmosphere of old Tokyo in this historic shopping street...",
+                        },
+                        {
+                            "start_time": "7: 30 PM",
+                            "end_time": "9: 30 PM",
+                            "activity": "Dinner at Ryugin",
+                            "description": "Experience innovative Japanese cuisine at this 3-Michelin starred restaurant...",
+                        },
                     ],
                     "hotel": {"name": "Hotel Chinzanso Tokyo"},
                 },
                 {
                     "date": "2025-04-26",
                     "schedule": [
-                        ["8: 00 AM", "Breakfast at Grain Bar"],
-                        ["9: 00 AM", "Day trip and hike at Mt. Takao"],
-                        ["1: 00 PM", "Lunch at Yakuo-In Temple"],
-                        ["4: 00 PM", "Spa retreat at Mandarin Oriental Spa Tokyo"],
-                        ["7: 00 PM", "Dinner at Andaz Tokyo Rooftop Bar"],
+                        {
+                            "start_time": "8: 00 AM",
+                            "end_time": "9: 00 AM",
+                            "activity": "Breakfast at Grain Bar",
+                            "description": "Start your day with healthy, grain-based breakfast...",
+                        },
+                        {
+                            "start_time": "9: 00 AM",
+                            "end_time": "1: 00 PM",
+                            "activity": "Day trip and hike at Mt. Takao",
+                            "description": "Enjoy a scenic hike with beautiful views of Mt. Fuji...",
+                        },
+                        {
+                            "start_time": "1: 00 PM",
+                            "end_time": "2: 30 PM",
+                            "activity": "Lunch at Yakuo-In Temple",
+                            "description": "Experience traditional Buddhist vegetarian cuisine...",
+                        },
+                        {
+                            "start_time": "4: 00 PM",
+                            "end_time": "6: 00 PM",
+                            "activity": "Spa retreat at Mandarin Oriental Spa Tokyo",
+                            "description": "Relax with traditional Japanese treatments and city views...",
+                        },
+                        {
+                            "start_time": "7: 00 PM",
+                            "end_time": "9: 00 PM",
+                            "activity": "Dinner at Andaz Tokyo Rooftop Bar",
+                            "description": "End your trip with cocktails and dinner with panoramic views...",
+                        },
                     ],
                     "hotel": {"name": "Hotel Chinzanso Tokyo"},
                 },
@@ -255,20 +472,56 @@ def get_mock_modified_itinerary(
     # Create a deep copy of the original plan
     modified_plan = json.loads(json.dumps(original_plan))
 
-    # Random activity options
+    # Random activity options with descriptions
     random_activities = [
-        "Visit Tokyo Skytree",
-        "Shopping at Shibuya 109",
-        "Explore Akihabara",
-        "Visit Ueno Park",
-        "Tea Ceremony Experience",
-        "Karaoke Session",
-        "Visit Ghibli Museum",
-        "Explore Tsutaya T-Site",
-        "Relax at Onsen",
-        "Japanese Cooking Class",
-        "Visit Teamlab Borderless",
-        "Sushi Making Experience",
+        {
+            "activity": "Visit Tokyo Skytree",
+            "description": "Experience breathtaking views from Japan's tallest structure...",
+        },
+        {
+            "activity": "Shopping at Shibuya 109",
+            "description": "Explore the trendy fashion mecca of Tokyo...",
+        },
+        {
+            "activity": "Explore Akihabara",
+            "description": "Discover Japan's electronics and anime culture center...",
+        },
+        {
+            "activity": "Visit Ueno Park",
+            "description": "Stroll through one of Tokyo's largest public parks...",
+        },
+        {
+            "activity": "Tea Ceremony Experience",
+            "description": "Learn about traditional Japanese tea culture...",
+        },
+        {
+            "activity": "Karaoke Session",
+            "description": "Enjoy a fun karaoke session in the heart of Tokyo...",
+        },
+        {
+            "activity": "Visit Ghibli Museum",
+            "description": "Immerse yourself in the magical world of Studio Ghibli...",
+        },
+        {
+            "activity": "Explore Tsutaya T-Site",
+            "description": "Visit one of the most beautiful bookstores in the world...",
+        },
+        {
+            "activity": "Relax at Onsen",
+            "description": "Unwind in a traditional Japanese hot spring bath...",
+        },
+        {
+            "activity": "Japanese Cooking Class",
+            "description": "Learn to make authentic Japanese dishes...",
+        },
+        {
+            "activity": "Visit Teamlab Borderless",
+            "description": "Experience immersive digital art installations...",
+        },
+        {
+            "activity": "Sushi Making Experience",
+            "description": "Learn the art of sushi making from expert chefs...",
+        },
     ]
 
     # Track which activities need to be modified
@@ -279,15 +532,26 @@ def get_mock_modified_itinerary(
     # Process each day's schedule
     for day in modified_plan["details"]:
         new_schedule = []
-        for time, activity in day["schedule"]:
-            if (day["date"], activity) in activities_to_modify:
+        for activity in day["schedule"]:
+            if (day["date"], activity["activity"]) in activities_to_modify:
                 # Replace with random activity
-                activity = random.choice(random_activities)
-            new_schedule.append((time, activity))
+                new_activity = random.choice(random_activities)
+                new_schedule.append(
+                    {
+                        "start_time": activity["start_time"],
+                        "end_time": activity["end_time"],
+                        "activity": new_activity["activity"],
+                        "description": new_activity["description"],
+                    }
+                )
+            else:
+                new_schedule.append(activity)
         day["schedule"] = new_schedule
 
     # Update highlights with some random activities
-    modified_plan["highlights"] = random.sample(random_activities, 3)
+    modified_plan["highlights"] = [
+        act["activity"] for act in random.sample(random_activities, 3)
+    ]
 
     # Slightly adjust the cost (randomly between -10% to +10%)
     cost_multiplier = random.uniform(0.9, 1.1)
