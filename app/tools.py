@@ -218,6 +218,58 @@ def format_itinerary(
     Converts the raw travel summary text into three formatted itinerary suggestions (List[ItineraryPlan]),
     including daily activities, time, and cost. The output structure must strictly follow the ItineraryPlan format.
     """
+    output_structure = """
+    [
+    {
+        "title": str,
+        "highlights": [str, str, ...],
+        "total_cost": int,
+        "avg_per_day": float,
+        "hotels": [
+            {
+                "name": str,
+                "price": int,
+                "rating": float,
+                "start_date": str,
+                "end_date": str
+            },
+            ...
+        ],
+        "flights": [
+            {
+                "start_date": str,
+                "from": str,
+                "to": str,
+                "airline": str,
+                "class": str,
+                "check-in luggage": bool,
+                "price": int
+            },
+            ...
+        ],
+        "details": [
+            {
+                "date": str,
+                "schedule": [
+                    {
+                        "start_time": str,
+                        "end_time": str,
+                        "activity": str,
+                        "description": str
+                    },
+                    ...
+                ],
+                "hotel": {
+                    "name": str
+                }
+            },
+            ...
+        ]
+    },
+    ...
+    ]
+    """
+
     query = f"""
     The content must be in {language}.
     Based on the following travel summary, generate three formatted itinerary suggestions. Each itinerary must follow the `ItineraryPlan` structure.
@@ -231,48 +283,7 @@ def format_itinerary(
     {raw_text}
     ---
     Please ensure the output structure is as follows:
-    [
-    {{
-        "title": str,
-        "highlights": [str, str, ...],
-        "total_cost": int,
-        "avg_per_day": int,
-        "hotels": [
-            {{
-                "name": str,
-                "price": int,
-                "rating": float,
-                "start_date": str,
-                "end_date": str
-            }},
-            ...
-        ],
-        "flights": [
-            {{
-                "start_date": str,
-                "from": str,
-                "to": str,
-                "airline": str,
-                "class": str,
-                "check-in luggage": bool,
-                "price": int
-            }},
-            ...
-        ],
-        "details": [
-        {{
-            "date": str,
-            "schedule": [
-            [str (time), str (activity name)]
-            ],
-            "hotel": {{
-                "name": str
-            }}
-        }}
-        ]
-    }},
-    ...
-    ]
+    {output_structure}
     """
 
     try:

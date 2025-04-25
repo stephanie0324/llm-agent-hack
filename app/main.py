@@ -9,6 +9,18 @@ import streamlit as st
 from agent import create_modify_itinerary_agent, create_travel_agent
 from mock_api import get_mock_itineraries, get_mock_modified_itinerary
 
+# Tool emoji mapping
+emoji_map = {
+    "search_web": "🔍",
+    "search_flights": "✈️",
+    "search_hotels": "🏨",
+    "search_activities": "🎯",
+    "search_restaurants": "🍽️",
+    "get_weather": "🌤️",
+    "get_exchange_rate": "💱",
+    "format_itinerary": "📅",
+}
+
 
 @dataclass
 class TravelPreferences:
@@ -108,40 +120,159 @@ class ItineraryPlanner:
     def __init__(self, config: TravelConfig):
         self.config = config
         self.agent = create_travel_agent()
+        self.emoji_map = {
+            "search_flight": "✈️",
+            "search_hotel": "🏨",
+            "get_weather": "⛅️",
+            "search_and_generate_itinerary": "🗺️",
+            "format_itinerary": "📋",
+        }
 
     def generate_prompt(self) -> str:
+        # 從 session state 獲取所有需要的變數
+        departure = st.session_state.get("departure", "Taipei")
+        destination = st.session_state.get("destination", "Tokyo")
+        start_date = st.session_state.get("start_date", datetime.date.today())
+        end_date = st.session_state.get(
+            "end_date", datetime.date.today() + datetime.timedelta(days=3)
+        )
+        days = (end_date - start_date).days
+
+        # 預算相關
+        total_budget = st.session_state.get("total_budget", 30000)
+        budget_currency = st.session_state.get("budget_currency", "TWD")
+        flight_budget = st.session_state.get("flight_budget", 10000)
+        hotel_budget = st.session_state.get("hotel_budget", 15000)
+
+        # 航班偏好
+        flight_class = st.session_state.get("flight_class", "Economy")
+        flight_time_pref = st.session_state.get("flight_time_pref", "Any")
+        airline_preference = st.session_state.get("airline_preference", None)
+        with_luggage = st.session_state.get("with_luggage", True)
+        non_stop = st.session_state.get("non_stop", True)
+
+        # 住宿偏好
+        hotel_stars = st.session_state.get("hotel_stars", "3★")
+        hotel_features = st.session_state.get("hotel_features", [])
+        hotel_type = st.session_state.get("hotel_type", [])
+
+        # 旅行偏好
+        travel_companions = st.session_state.get("travel_companions", "Solo")
+        transportation = st.session_state.get("transportation", "Public Transport")
+        travel_style = st.session_state.get("travel_style", [])
+        dietary = st.session_state.get("dietary", ["None"])
+        interests = st.session_state.get("interests", [])
+
+        # 語言設定
+        lang_code = st.session_state.get("language", "English")
+
         return f"""
         Please help plan 3 personalized itinerary for the user to choose with the following information:
         Consider the below details, budget and weather.
 
-        Departure: {self.config.departure}
-        Destination: {self.config.destination}
-        Total Days: {self.config.days}
-        Start Date: {self.config.start_date}
-        End Date: {self.config.end_date}
-        Budget: {self.config.total_budget} {self.config.currency}
+        Departure: {departure}
+        Destination: {destination}
+        Total Days: {days}
+        Start Date: {start_date}
+        End Date: {end_date}
+        Budget: {total_budget} {budget_currency}
 
         Flight Preferences:
-        - Flight Budget: {self.config.flight_prefs.budget}
-        - Class: {self.config.flight_prefs.flight_class}
-        - Preferred Time: {self.config.flight_prefs.time_preference}
-        - Preferred Airline: {self.config.flight_prefs.airline or "None"}
-        - Checked Luggage: {'Yes' if self.config.flight_prefs.with_luggage else 'No'}
-        - Non-Stop Flight: {'Yes' if self.config.flight_prefs.non_stop else 'No'}
+        - Flight Budget: {flight_budget}
+        - Class: {flight_class}
+        - Preferred Time: {flight_time_pref}
+        - Preferred Airline: {airline_preference or "None"}
+        - Checked Luggage: {'Yes' if with_luggage else 'No'}
+        - Non-Stop Flight: {'Yes' if non_stop else 'No'}
 
         Hotel Preferences:
-        - Hotel Budget: {self.config.hotel_prefs.budget}
-        - Stars: {self.config.hotel_prefs.stars}
-        - Features: {', '.join(self.config.hotel_prefs.features) if self.config.hotel_prefs.features else 'None'}
-        - Type: {', '.join(self.config.hotel_prefs.types) if self.config.hotel_prefs.types else 'None'}
+        - Hotel Budget: {hotel_budget}
+        - Stars: {hotel_stars}
+        - Features: {', '.join(hotel_features) if hotel_features else 'None'}
+        - Type: {', '.join(hotel_type) if hotel_type else 'None'}
 
-        Language: {self.config.travel_prefs.language}
+        Companions: {travel_companions}
+        Transportation Preference: {transportation}
+        Travel Style: {', '.join(travel_style) if travel_style else 'None'}
+        Dietary Requirements: {', '.join(dietary) if dietary else 'None'}
+        Interests: {', '.join(interests) if interests else 'None'}
+        Remaining Budget: {total_budget - (flight_budget + hotel_budget)}
+
+        Language: {lang_code}
+        You need to use `format_itinerary` to return the result in json format and only the json format.
         """
 
     def generate_itineraries(self):
         prompt = self.generate_prompt()
-        # Implementation here...
-        return get_mock_itineraries()  # 暫時使用 mock 資料
+
+        with st.spinner("🧠 Agent is reasoning..."):
+            progress_bar = st.progress(0)
+            progress_text = st.empty()
+            thought_block = st.expander("", expanded=True)
+
+            try:
+                # Initialize counter and list for tool names
+                tool_call_count = 0
+                function_names = []  # List to store all function names
+
+                # Dynamically collect tool calls and display detailed output
+                with thought_block:
+                    raw_content = None
+                    for event in self.agent.stream(
+                        {"messages": [{"role": "user", "content": prompt}]}
+                    ):
+                        if "agent" in event:
+                            for message in event["agent"]["messages"]:
+                                # Check if message contains tool calls
+                                if hasattr(message, "additional_kwargs"):
+                                    tool_calls = getattr(
+                                        message, "additional_kwargs", {}
+                                    ).get("tool_calls", [])
+
+                                    for tool_call in tool_calls:
+                                        tool_name = tool_call["function"]["name"]
+                                        tool_args = tool_call["function"]["arguments"]
+                                        emoji = self.emoji_map.get(tool_name, "🔧")
+
+                                        with st.chat_message("assistant"):
+                                            st.markdown(
+                                                f"{emoji} **Calling `{tool_name}`**"
+                                            )
+                                            st.code(tool_args, language="json")
+
+                                        # Update progress bar dynamically
+                                        tool_call_count += 1
+                                        progress = min(
+                                            tool_call_count / (tool_call_count + 1), 1.0
+                                        )
+                                        progress_bar.progress(progress)
+
+                                # If it is the final result, display the final output
+                                if hasattr(message, "content") and message.content:
+                                    raw_content = message.content
+                                    progress_bar.progress(1.0)  # Complete
+                                    progress_text.text("✅ Process complete! 🎉")
+                                    break  # Break the loop after getting the final result
+
+                    if raw_content:
+                        # Extract JSON from the raw content
+                        cleaned = re.search(r"```json(.*?)```", raw_content, re.DOTALL)
+                        itineraries = (
+                            json.loads(cleaned.group(1).strip())
+                            if cleaned
+                            else json.loads(raw_content.strip())
+                        )
+                        return itineraries
+                    else:
+                        raise Exception("No content received from agent")
+
+            except Exception as e:
+                st.error(f"發生錯誤：{str(e)}")
+                # 如果發生錯誤，返回 mock 資料
+                return get_mock_itineraries()
+            finally:
+                # 確保進度條完成
+                progress_bar.progress(1.0)
 
 
 class TravelUI:
