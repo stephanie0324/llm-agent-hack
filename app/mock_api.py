@@ -18,7 +18,7 @@ class ItineraryPlan(TypedDict):
 
 def get_mock_itineraries() -> List[ItineraryPlan]:
     """
-    返回模擬的旅遊行程資料
+    Return mock travel itinerary data
     """
     return [
         {
