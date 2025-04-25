@@ -298,47 +298,6 @@ def format_itinerary(
 
 
 @tool
-def modify_itinerary(
-    current_itinerary: Dict,
-    modification_request: str,
-    preferences: Dict,
-) -> Dict:
-    """
-    🔄 Modify the existing itinerary based on user requests and preferences.
-
-    Args:
-        current_itinerary (Dict): The current itinerary to be modified
-        modification_request (str): Specific modification requests from the user
-        preferences (Dict): User preferences, including budget, interests, etc.
-
-    Returns:
-        Dict: Modified itinerary
-    """
-    try:
-        query = f"""
-        Please modify the following itinerary according to the user's request and preferences:
-        
-        Current Itinerary:
-        {current_itinerary}
-        
-        Modification Request:
-        {modification_request}
-        
-        User Preferences:
-        {preferences}
-        
-        Please maintain the same time structure but modify the selected activities according to the request.
-        Consider the user's preferences while making modifications.
-        Ensure the modifications are realistic and maintain the flow of the itinerary.
-        """
-
-        return get_response_from_ai_service(query)
-
-    except Exception as e:
-        return f"❌ Error: {str(e)}"
-
-
-@tool
 def search_activities(
     location: str,
     interests: List[str],
