@@ -2,6 +2,13 @@ from typing import List, Tuple
 from pydantic import BaseModel, Field
 
 
+class Activity(BaseModel):
+    start_time: str
+    end_time: str
+    activity: str
+    description: str
+
+
 class Flight(BaseModel):
     start_date: str
     from_: str = Field(..., alias="from")
@@ -26,7 +33,7 @@ class DayHotel(BaseModel):
 
 class DaySchedule(BaseModel):
     date: str
-    schedule: List[Tuple[str, str]]
+    schedule: List[Activity]
     hotel: DayHotel
 
 

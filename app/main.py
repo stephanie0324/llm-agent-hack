@@ -1356,8 +1356,43 @@ class TravelApp:
         # Get button text based on language
         button_text = self._get_generate_button_text()
 
+        st.markdown(
+            """
+            <style>
+                .stButton>button {
+                    background-color: #87CEEB;
+                    color: white;
+                    width: 75%;  
+                    padding: 20px 40px; 
+                    font-size: 20px;
+                    font-family: 'Arial', sans-serif;
+                    display: block;
+                    margin-left: auto;
+                    margin-right: auto;
+                    border-radius: 12px;
+                    border: none;
+                    box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
+                    transition: all 0.3s ease;
+                    margin-top: auto;
+                }
+
+                .stButton>button:hover {
+                    background-color: #5D8AA8;
+                    transform: translateY(-3px);
+                    box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.3);
+                }
+
+                .stButton>button:focus {
+                    outline: none;
+                }
+            </style>
+        """,
+            unsafe_allow_html=True,
+        )
         # Handle generate button click
+        # 創建按鈕並處理點擊事件
         if st.button(button_text, use_container_width=True):
+            # 當按鈕被點擊時執行的操作
             self._handle_generate_click()
 
         # Display itineraries if available
@@ -1375,19 +1410,18 @@ class TravelApp:
 
     def _handle_generate_click(self):
         """Handle generate button click event"""
-        with st.spinner("🧠 Generating itineraries..."):
-            # Create config from UI inputs
-            self.config = self.ui.get_current_config()
+        # Create config from UI inputs
+        self.config = self.ui.get_current_config()
 
-            # Create planner with config
-            self.planner = ItineraryPlanner(self.config)
+        # Create planner with config
+        self.planner = ItineraryPlanner(self.config)
 
-            # Generate itineraries
-            itineraries = self.planner.generate_itineraries()
+        # Generate itineraries
+        itineraries = self.planner.generate_itineraries()
 
-            # Save to session state
-            st.session_state.itineraries = itineraries
-            st.session_state.selected_plan = None
+        # Save to session state
+        st.session_state.itineraries = itineraries
+        st.session_state.selected_plan = None
 
 
 if __name__ == "__main__":

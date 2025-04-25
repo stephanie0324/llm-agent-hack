@@ -217,6 +217,9 @@ def format_itinerary(
     """
     Converts the raw travel summary text into three formatted itinerary suggestions (List[ItineraryPlan]),
     including daily activities, time, and cost. The output structure must strictly follow the ItineraryPlan format.
+    Time need to be 24 hrs.
+    There should be three itinerary plans.
+    Strictly follow the rules of the output structure.
     """
     output_structure = """
     [
