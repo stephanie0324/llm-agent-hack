@@ -401,6 +401,9 @@ class ModifyItineraryAgent:
         modification_instruction: str,
         history: ItineraryHistory,
     ) -> dict:
+        return get_mock_modified_itinerary(
+            original_plan, selected_activities, modification_instruction
+        )
         # Prepare prompt
         prompt = self._generate_modification_prompt(
             original_plan, selected_activities, modification_instruction
