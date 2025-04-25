@@ -1065,9 +1065,17 @@ class TravelUI:
         .schedule-table td[data-activity]:hover {{
             background-color: #2196F3 !important;
             color: white !important;
-            transform: scale(1.02);
+            /* Remove the scale transform to prevent color from showing through header gaps */
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             cursor: pointer;
+            z-index: 1;
+        }}
+
+        .schedule-table thead {{
+            position: sticky;
+            top: 0;
+            background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+            color: white;
             z-index: 2;
         }}
 
@@ -1150,7 +1158,7 @@ class TravelUI:
 <table class="schedule-table" style="width: 100%; border-collapse: collapse; text-align: center; position: relative; font-family: Arial, sans-serif;">
 <thead style="position: sticky; top: 0; background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 2;">
 <tr>
-<th style="border: 1px solid #ddd; padding: 12px; min-width: 80px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">Time</th>
+<th style="border: 1px solid #ddd; padding: 12px; min-width: 80px; width: 80px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">Time</th>
 """
         # Get all dates and format them as MM/DD
         dates = []
@@ -1167,7 +1175,7 @@ class TravelUI:
             formatted_dates.append(
                 f"{formatted_date}<br><span style='font-size: 13px; opacity: 0.9;'>{day_of_week}</span>"
             )
-            message += f'<th style="border: 1px solid #ddd; padding: 12px; min-width: 200px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">{formatted_dates[-1]}</th>'
+            message += f'<th style="border: 1px solid #ddd; padding: 12px; min-width: 200px; width: 200px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">{formatted_dates[-1]}</th>'
 
         message += """
 </tr>
@@ -1175,9 +1183,29 @@ class TravelUI:
 <tbody>
 """
 
-        # Create time slots for 24 hours with 30-minute intervals
+        # Calculate the earliest and latest activity times
+        earliest_time = "23:59"
+        latest_time = "00:00"
+        for day in plan["details"]:
+            for activity in day["schedule"]:
+                start_time = self.standardize_time_format(activity["start_time"])
+                end_time = self.standardize_time_format(activity["end_time"])
+                if start_time < earliest_time:
+                    earliest_time = start_time
+                if end_time > latest_time:
+                    latest_time = end_time
+
+        # Adjust the earliest and latest times
+        earliest_hour, earliest_minute = map(int, earliest_time.split(":"))
+        latest_hour, latest_minute = map(int, latest_time.split(":"))
+        earliest_hour = max(0, earliest_hour - 1)
+        # Remove the extra hour addition to latest_hour
+        # latest_hour = min(23, latest_hour + 1)
+        latest_hour = min(23, latest_hour)
+
+        # Create time slots based on the adjusted earliest and latest times
         time_slots = []
-        for hour in range(24):
+        for hour in range(earliest_hour, latest_hour + 1):
             for minute in [0, 30]:
                 time_slots.append(f"{hour:02d}:{minute:02d}")
 
@@ -1218,6 +1246,7 @@ class TravelUI:
                 hour_int = 12
             elif hour_int > 12:
                 hour_int -= 12
+
             formatted_time = f"{hour_int}:{minute} {period}"
 
             message += "<tr>"
