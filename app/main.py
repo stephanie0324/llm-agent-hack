@@ -1360,8 +1360,8 @@ class TravelApp:
             """
             <style>
                 .stButton>button {
-                    background-color: #87CEEB;
-                    color: white;
+                    background-color: white;  /* 按鈕背景顏色保持白色 */
+                    color: #87CEEB;  /* 文字顏色 */
                     width: 75%;  
                     padding: 20px 40px; 
                     font-size: 20px;
@@ -1369,21 +1369,31 @@ class TravelApp:
                     display: block;
                     margin-left: auto;
                     margin-right: auto;
-                    border-radius: 12px;
-                    border: none;
+                    border-radius: 12px;  /* 圓角邊框 */
+                    border: 3px solid #87CEEB;  /* 設置藍色邊框 */
                     box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
                     transition: all 0.3s ease;
                     margin-top: auto;
                 }
 
                 .stButton>button:hover {
-                    background-color: #5D8AA8;
+                    background-color: #87CEEB;  /* 懸停時背景變藍 */
+                    color: white;  /* 文字顏色變白 */
                     transform: translateY(-3px);
                     box-shadow: 0px 6px 20px rgba(0, 0, 0, 0.3);
                 }
 
                 .stButton>button:focus {
                     outline: none;
+                    background-color: white;  /* 保持背景為白色 */
+                    border-color: #5D8AA8;  /* 焦點時邊框顏色變深藍 */
+                }
+
+                .stButton>button:active {
+                    background-color: white;  /* 點擊時保持白色背景 */
+                    border-color: #5D8AA8;  /* 點擊時邊框顏色變深藍 */
+                    transform: translateY(1px);
+                    box-shadow: none;
                 }
             </style>
         """,

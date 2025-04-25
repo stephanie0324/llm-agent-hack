@@ -184,7 +184,7 @@ def search_and_generate_itinerary(
         # Construct the query for generating the itinerary based on inputs
         query = f"""
         Generate a {days}-day itinerary for the destination {destination} from {start_date} to {end_date}.
-        Please generate 3 itinerary options for the user to choose from.
+        Please generate 3 totally different options for the user to choose from.
         The user has the following preferences:
         - Interests: {interests}
         - Weather: {weather}
@@ -278,6 +278,10 @@ def format_itinerary(
     Based on the following travel summary, generate three formatted itinerary suggestions. Each itinerary must follow the `ItineraryPlan` structure.
     The output should be in a JSON array format (List[ItineraryPlan]) and must include the following fields:
     When you generate title, please make it short and catchy.
+    The schedule in details, should include the start time, end time, the full activity name and a description, which is the introduction of the activity.
+    The description can included some recommendations regarding to the place, restaurant or activities.
+    The total cost should be the sum of all costs in the itinerary.
+    
 
     Location: {destination}
     Trip duration: {trip_days} days
