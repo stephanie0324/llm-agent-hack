@@ -216,7 +216,8 @@ class ItineraryPlanner:
 
     def generate_itineraries(self):
         # Use mock data for development
-        # return get_mock_itineraries()
+        return get_mock_itineraries()
+
         prompt = self.generate_prompt()
 
         with st.spinner("🧠 Agent is reasoning..."):
@@ -402,9 +403,10 @@ class ModifyItineraryAgent:
         history: ItineraryHistory,
     ) -> dict:
         # for development
-        # return get_mock_modified_itinerary(
-        #     original_plan, selected_activities, modification_instruction
-        # )
+        return get_mock_modified_itinerary(
+            original_plan, selected_activities, modification_instruction
+        )
+
         # Prepare prompt
         prompt = self._generate_modification_prompt(
             original_plan, selected_activities, modification_instruction
@@ -697,8 +699,8 @@ class TravelUI:
             date_range = st.date_input(
                 "🗓️ Travel Dates (Start - End)",
                 [
-                    datetime.date.today(),
-                    datetime.date.today() + datetime.timedelta(days=3),
+                    datetime.date.today() + datetime.timedelta(days=30),
+                    datetime.date.today() + datetime.timedelta(days=33),
                 ],
                 key="date_range",
             )
@@ -1017,8 +1019,8 @@ class TravelUI:
                 f"⚠️ This modification might increase the total cost beyond your budget of {current_budget} {st.session_state.get('budget_currency', 'TWD')}"
             )
 
-        # Create two columns for buttons
-        col1, col2 = st.columns(2)
+        # Create three columns for buttons
+        col1, col2, col3 = st.columns(3)
 
         # Modify button on the left
         with col1:
@@ -1028,8 +1030,16 @@ class TravelUI:
                 use_container_width=True,
             )
 
-        # Back button on the right
+        # Submit button in the middle
         with col2:
+            submit_clicked = st.button(
+                "Submit",
+                key=f"{key_prefix}_submit",
+                use_container_width=True,
+            )
+
+        # Back button on the right
+        with col3:
             back_clicked = st.button(
                 "🔙 Back to all plans",
                 key=f"{key_prefix}_back",
@@ -1053,10 +1063,137 @@ class TravelUI:
                 st.session_state.current_mod_key_prefix = f"mod_{int(time.time())}"
                 return selected_activities, modification_instruction
 
+        if submit_clicked:
+            # Redirect to the final itinerary confirmation page
+            st.session_state.final_plan = plan
+            st.session_state.page = "confirmation"
+            st.rerun()
+
         return None, None
 
-    def display_chat_itinerary(self, plan):
+    def display_confirmation_page(self):
+        """Display the final itinerary confirmation page with a booking button"""
+        plan = st.session_state.get("final_plan", None)
+        if not plan:
+            st.error("No plan available for confirmation.")
+            return
+
+        display_itinerary_html = self.display_chat_itinerary(plan, show_details=True)
+        st.markdown(display_itinerary_html, unsafe_allow_html=True)
+
+        st.markdown(
+            "🔽 Click the button below to automatically book the following items:"
+        )
+        st.markdown(
+            """
+        - 🛫 Flights (based on your preferred time and airline)
+        - 🏨 Hotels (with breakfast / near train stations)
+        - 🚖 Airport transfers and local transportation passes
+        - 🎟️ Attraction tickets (if included in the itinerary)
+        """
+        )
+
+        if not st.session_state.booking_done:
+            if st.button("✅ Book All (Flights, Hotels, Transport)"):
+                with st.spinner("⏳ Booking in progress... Please wait a moment."):
+                    time.sleep(5)  # 模擬API請求等待時間
+                st.success(
+                    "🎉 Booking confirmed! All items have been successfully arranged."
+                )
+                st.session_state.booking_done = True
+                st.rerun()
+        else:
+            if st.button("💳 Proceed to Payment"):
+                # Simulated payment flow
+                st.markdown("Please click the link below to complete your payment:")
+                st.markdown(
+                    "[🔗 Go to Payment Page](https://mockpayment.example.com/pay?plan_id=1234)",
+                    unsafe_allow_html=True,
+                )
+                st.info(
+                    "💡 You will receive an email confirmation once payment is complete."
+                )
+
+        # Get current plan
+        # current_plan = st.session_state.itineraries[st.session_state.selected_plan]
+
+        # Display detailed itinerary
+        # st.markdown("### Detailed Itinerary")
+        # selected_activities, modification_instruction = self.display_modification_ui(
+        #     current_plan, current_date=None
+        # )
+
+        # Handle modification if user submitted
+        # if selected_activities and modification_instruction:
+        #     modified_plan = self.handle_modification_result(
+        #         current_plan,
+        #         selected_activities,
+        #         modification_instruction,
+        #     )
+        #     st.rerun()
+
+    def _generate_plan_details(self, plan: dict) -> str:
+        message = f"""
+<div style="font-family: Arial, sans-serif; padding: 0px 20px;">
+    <h3 style="color: #34495e;">Hotel:</h3>
+    <ul>
+        """
+        for hotel in plan["hotels"]:
+            message += f"<li>{hotel['name']} ({hotel['start_date']} ~ {hotel['end_date']}) - ${hotel['price']:,} - Rating: {hotel['rating']}</li>"
+
+        message += f"""
+    </ul>
+    <h3 style="color: #34495e;">Flights:</h3>
+    <ul>
+        """
+
+        for flight in plan["flights"]:
+            message += f"<li>{flight['start_date']}: {flight['from']} ➔ {flight['to']} ({flight['airline']}, {flight['class']}, ${flight['price']:,})</li>"
+
+        message += "</ul>"
+
+        message += "<hr><h2 style='color: #2c3e50;'>Detailed Itinerary:</h2>"
+
+        for day in plan["details"]:
+            message += f"""<div style="margin-bottom: 30px;">
+        <h3 style="color: #2980b9;">{day['date']}</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+                <tr style="background-color: #ecf0f1;">
+                    <th style="border: 1px solid #bdc3c7; padding: 8px;">Start Time</th>
+                    <th style="border: 1px solid #bdc3c7; padding: 8px;">End Time</th>
+                    <th style="border: 1px solid #bdc3c7; padding: 8px;">Activity</th>
+                    <th style="border: 1px solid #bdc3c7; padding: 8px;">Description</th>
+                </tr>
+            </thead>
+            <tbody>
+            """
+
+            for item in day["schedule"]:
+                message += f"""<tr>
+                    <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['start_time']}</td>
+                    <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['end_time']}</td>
+                    <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['activity']}</td>
+                    <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['description']}</td>
+                </tr>
+                """
+
+            message += """</tbody>
+        </table>
+        <p style="margin-top: 8px; font-style: italic; color: #7f8c8d;">Hotel: {}</p>
+    </div>
+            """.format(
+                day["hotel"]["name"]
+            )
+
+        message += "</div>"
+
+        return message
+
+    def display_chat_itinerary(self, plan, show_details=False):
         """Display itinerary in chat format with table schedule"""
+        # print("plan")
+        # print(json.dumps(plan))
         message = f"""
 <div style="padding: 25px; border-radius: 12px; border: 2px solid #1E90FF; margin: 15px 0; background-color: #ffffff; box-shadow: 0 2px 8px rgba(30, 144, 255, 0.1);">
 <head>
@@ -1255,9 +1392,9 @@ class TravelUI:
 
             message += "<tr>"
             # Add gradient background to time column based on time of day
-            time_bg_color = self._get_time_background_color(int(hour))
-            message += f"""<td style="border: 1px solid #ddd; padding: 12px; font-weight: 500; color: #2c3e50; 
-                          background: {time_bg_color}; font-size: 14px;">{formatted_time}</td>"""
+            time_style = self._get_time_style(int(hour))
+            message += f"""<td style="border: 1px solid #ddd; padding: 12px; font-weight: 500; 
+                          {time_style}; font-size: 14px;">{formatted_time}</td>"""
 
             for date in dates:
                 if time_slot in skip_cells[date]:
@@ -1305,20 +1442,38 @@ class TravelUI:
 </table>
 </div>
 </div>
-</div>
 """
+
+        if show_details:
+            message += self._generate_plan_details(plan)
+
+        message += """</div>"""
+
         return message
 
-    def _get_time_background_color(self, hour: int) -> str:
+    def _get_time_style(self, hour: int) -> str:
         """Get background color gradient based on time of day"""
         if 6 <= hour < 12:  # Morning
-            return "linear-gradient(90deg, #fff4e6 0%, #fff8f0 100%)"
+            return "color: #2c3e50; background: linear-gradient(90deg, #fff4e6 0%, #fff8f0 100%)"
         elif 12 <= hour < 18:  # Afternoon
-            return "linear-gradient(90deg, #e6f3ff 0%, #f0f8ff 100%)"
+            return "color: #2c3e50; background: linear-gradient(90deg, #e6f3ff 0%, #f0f8ff 100%)"
         elif 18 <= hour < 22:  # Evening
-            return "linear-gradient(90deg, #fff0f5 0%, #fff5fa 100%)"
+            return "background: linear-gradient(90deg, #fff0f5 0%, #fff5fa 100%)"
         else:  # Night
-            return "linear-gradient(90deg, #f5f5f5 0%, #fafafa 100%)"
+            background_style = """color: #FFFFFF; 
+                background-image:"""
+            background_style += """radial-gradient(circle at 20% 30%, #ffe599 1px, transparent 2px),
+                    radial-gradient(circle at 70% 20%, #ffe599 0.5px, transparent 2px),
+                    radial-gradient(circle at 40% 80%, #ffe599 1px, transparent 2px),
+                    radial-gradient(circle at 80% 60%, #ffe599 1px, transparent 2px),
+                    radial-gradient(circle at 10% 70%, #ffe599 0.5px, transparent 2px),"""
+            background_style += """
+                    linear-gradient(90deg, rgba(11, 26, 46, 0.85) 0%, rgba(22, 44, 70, 0.85) 100%);
+                background-size: 100% 100%;
+                background-repeat: no-repeat;
+                background-position: center center;
+            """
+            return background_style
 
     def handle_modification_result(
         self, plan, selected_activities, modification_instruction
@@ -1415,22 +1570,9 @@ class TravelUI:
         """
         selected_activities = []
 
-        # Format average per day to remove trailing zeros while keeping the thousands separator
-        avg_per_day = f"{plan['avg_per_day']:,.3f}".rstrip("0").rstrip(".")
-
-        # Display plan title and cost summary
-        st.markdown(f"### ✨ {plan['title']}")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**Total Cost:** NT$ {plan['total_cost']:,}")
-        with col2:
-            st.markdown(f"**Average Per Day:** NT$ {avg_per_day}")
-
-        st.markdown("---")
-
         # Display schedule for each day
         for day_schedule in plan["details"]:
-            with st.expander(f"📅 Date {day_schedule['date']}", expanded=True):
+            with st.expander(f"📅 Date {day_schedule['date']}", expanded=False):
                 # Create activities list
                 activities = []
                 for activity in day_schedule["schedule"]:
@@ -1623,6 +1765,8 @@ class TravelApp:
             st.session_state.booking_done = False
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
+        if "booking_done" not in st.session_state:
+            st.session_state.booking_done = False
 
     def setup(self):
         """Setup the application"""
@@ -1635,6 +1779,11 @@ class TravelApp:
 
         # Render sidebar and get configuration
         self.ui.render_sidebar()
+
+        # Check if we are on the confirmation page
+        if st.session_state.get("page") == "confirmation":
+            self.ui.display_confirmation_page()
+            return
 
         # Get button text based on language
         button_text = self._get_generate_button_text()

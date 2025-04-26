@@ -64,7 +64,7 @@ def get_mock_itineraries() -> List[ItineraryPlan]:
                     "date": "2025-04-24",
                     "schedule": [
                         {
-                            "start_time": "08:00",
+                            "start_time": "04:00",
                             "end_time": "10:00",
                             "activity": "Breakfast at Aman Tokyo Café",
                             "description": "Breakfast at Aman Tokyo Café, featuring a stunning blend of Western and Japanese breakfast options with panoramic city views. Enjoy fresh pastries, seasonal fruits, and traditional Japanese breakfast items in an elegant setting.",
@@ -89,7 +89,7 @@ def get_mock_itineraries() -> List[ItineraryPlan]:
                         },
                         {
                             "start_time": "19:00",
-                            "end_time": "21:00",
+                            "end_time": "23:00",
                             "activity": "Dinner at Ishikawa",
                             "description": "Savor traditional Japanese kaiseki at the prestigious Ishikawa, a three-Michelin-starred restaurant. Experience the epitome of Japanese haute cuisine with seasonal ingredients and impeccable presentation in an intimate setting.",
                         },
