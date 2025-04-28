@@ -202,7 +202,7 @@ class ItineraryPlanner:
         Remaining Budget: {total_budget - (flight_budget + hotel_budget)}
 
         Language: {lang_code}
-        You need to use `format_itinerary` to return the result in json format and only the json format.
+        You MUST use `format_itinerary` to return the result in json format and only the json format.
         """
 
     def generate_itineraries(self):
@@ -214,7 +214,7 @@ class ItineraryPlanner:
         with st.spinner("🧠 Agent is reasoning..."):
             progress_bar = st.progress(0)
             progress_text = st.empty()
-            thought_block = st.expander("", expanded=True)
+            thought_block = st.expander("🤔 Agent's Thought Process", expanded=False)
 
             try:
                 # Initialize counter and list for tool names
@@ -386,7 +386,7 @@ class ModifyItineraryAgent:
         - get_weather: Check weather conditions (outdoor activities)
         - format_itinerary: Format the final itinerary
 
-        Please return the complete modified itinerary in JSON format.
+        You MUST use `format_itinerary` to return the modified itinerary in json format and only the json format.
         """
 
     def modify_itinerary(
@@ -411,7 +411,7 @@ class ModifyItineraryAgent:
         progress_text = st.empty()
 
         # Create an expander for agent's thought process
-        thought_block = st.expander("🤔 Agent's Thought Process", expanded=True)
+        thought_block = st.expander("🤔 Agent's Thought Process", expanded=False)
 
         try:
             # Initialize tool call counter and thoughts list
@@ -502,7 +502,10 @@ class ModifyItineraryAgent:
                         if cleaned
                         else json.loads(raw_content.strip())
                     )
-                    return modified_plan
+                    if isinstance(modified_plan, list):
+                        return modified_plan[0]
+                    else:
+                        return modified_plan
                 else:
                     raise Exception("No content received from agent")
 
@@ -561,39 +564,6 @@ class TravelUI:
                 letter-spacing: 1px;
                 font-style: italic;
             }}
-            .footer {{
-                position: fixed;
-                right: 0;
-                bottom: 0;
-                width: calc(100% - 500px);
-                text-align: center;
-                padding: 20px;
-                background-color: white;
-                box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-                z-index: 1000;
-            }}
-            .footer .divider {{
-                border: 0;
-                border-top: 3px solid #00BFFF;
-                width: 60%;
-                margin: 0 auto 15px auto;
-                opacity: 0.6;
-            }}
-            .footer-text {{
-                font-size: 18px;
-                font-family: 'Arial', sans-serif;
-                letter-spacing: 1px;
-            }}
-            .footer a.streamlit {{
-                color: #FF4500;  /* Orange Red for Streamlit */
-                text-decoration: none;
-                font-weight: bold;
-            }}
-            .footer a.azure {{
-                color: #1E90FF;  /* Dodger Blue for Azure */
-                text-decoration: none;
-                font-weight: bold;
-            }}
             </style>
             <div class="header-container">
                 <div class="header">
@@ -601,12 +571,6 @@ class TravelUI:
                 </div>
                 <div class="subheader">
                     Your go-to travel assistant for the perfect vacation 🏖️
-                </div>
-            </div>
-            <div class="footer">
-                <div class="divider"></div>
-                <div class="footer-text">
-                    Powered by <a href="https://www.streamlit.io" target="_blank" class="streamlit">Streamlit</a> & <a href="https://azure.microsoft.com" target="_blank" class="azure">Azure</a> ✨
                 </div>
             </div>
     """,
@@ -912,10 +876,10 @@ class TravelUI:
                 {"".join([f"<li>{spot}</li>" for spot in plan['highlights']])}
             </ul>
             <p style="text-align: left; font-size: 16px; margin-top: 20px;">
-                <strong>Estimated Total Cost:</strong> NT$ {plan['total_cost']:,}
+                <strong>Estimated Total Cost:</strong> {plan['currency']} {plan['total_cost']:,}
             </p>
             <p style="text-align: left; font-size: 16px;">
-                <strong>Average Per Day:</strong> NT$ {avg_per_day}
+                <strong>Average Per Day:</strong> {plan['currency']} {avg_per_day}
             </p>
         </div>
         """
@@ -1014,7 +978,7 @@ class TravelUI:
             )
 
         # Create three columns for buttons
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
 
         # Modify button on the left
         with col1:
@@ -1027,23 +991,10 @@ class TravelUI:
         # Submit button in the middle
         with col2:
             submit_clicked = st.button(
-                "Submit",
+                "✅ Confirm & Book",
                 key=f"{key_prefix}_submit",
                 use_container_width=True,
             )
-
-        # Back button on the right
-        with col3:
-            back_clicked = st.button(
-                "🔙 Back to all plans",
-                key=f"{key_prefix}_back",
-                use_container_width=True,
-            )
-
-        if back_clicked:
-            st.session_state.selected_plan = None
-            self.chat_history.clear()
-            st.rerun()
 
         if modify_clicked:
             if not selected_activities:
@@ -1058,6 +1009,8 @@ class TravelUI:
                 return selected_activities, modification_instruction
 
         if submit_clicked:
+            # Hide sidebar
+            st.session_state.sidebar_visibility = False
             # Redirect to the final itinerary confirmation page
             st.session_state.final_plan = plan
             st.session_state.page = "confirmation"
@@ -1086,7 +1039,7 @@ class TravelUI:
 <li>
     <strong>{hotel['name']}</strong> (Rating: {hotel['rating']})
     <br>Check-in: {hotel['start_date']} | Check-out: {hotel['end_date']}
-    <br>Price: ${hotel['price']:,}
+    <br>Price: {plan['currency']} {hotel['price']:,}
     <br><a href="{hotel['booking_link']}" target="_blank">🔗 Book Now</a>
 </li>
             """
@@ -1103,7 +1056,7 @@ class TravelUI:
     <strong>{flight['airline']}</strong>
     <br>Route: {flight['from']} ➔ {flight['to']}
     <br>Date: {flight['start_date']} | Class: {flight['class']}
-    <br>Price: ${flight['price']:,}
+    <br>Price: {plan['currency']} {flight['price']:,}
     <br><a href="{flight['booking_link']}" target="_blank">🔗 Book Now</a>
 </li>
             """
@@ -1116,8 +1069,8 @@ class TravelUI:
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
             <thead>
                 <tr style="background-color: #ecf0f1;">
-                    <th style="border: 1px solid #bdc3c7; padding: 8px;">Start Time</th>
-                    <th style="border: 1px solid #bdc3c7; padding: 8px;">End Time</th>
+                    <th style="border: 1px solid #bdc3c7; padding: 8px; width: 120px;">Start Time</th>
+                    <th style="border: 1px solid #bdc3c7; padding: 8px; width: 120px;">End Time</th>
                     <th style="border: 1px solid #bdc3c7; padding: 8px;">Activity</th>
                     <th style="border: 1px solid #bdc3c7; padding: 8px;">Description</th>
                 </tr>
@@ -1246,7 +1199,7 @@ class TravelUI:
   {"".join([f'<span style="background-color: #f0f8ff; padding: 6px 12px; border-radius: 20px; border: 1px solid #1E90FF; font-size: 14px;">{highlight}</span>' for highlight in plan['highlights']])}
 </div>
 
-💰 **Total Cost**: NT$ {plan['total_cost']:,}
+💰 **Total Cost**: {plan['currency']} {plan['total_cost']:,}
 
 📅 **Daily Schedule**:
 
@@ -1723,6 +1676,8 @@ class TravelApp:
             st.session_state.chat_history = []
         if "booking_done" not in st.session_state:
             st.session_state.booking_done = False
+        if "sidebar_visibility" not in st.session_state:
+            st.session_state.sidebar_visibility = True
 
     def setup(self):
         """Setup the application"""
@@ -1734,7 +1689,8 @@ class TravelApp:
         self.setup()
 
         # Render sidebar and get configuration
-        self.ui.render_sidebar()
+        if st.session_state.sidebar_visibility:
+            self.ui.render_sidebar()
 
         # Check if we are on the confirmation page
         if st.session_state.get("page") == "confirmation":
@@ -1787,14 +1743,84 @@ class TravelApp:
         """,
             unsafe_allow_html=True,
         )
-        # Handle generate button click
-        # Handle button click event
-        if st.button(button_text, use_container_width=True):
-            # Operation when button is clicked
-            self._handle_generate_click()
+
+        if st.session_state.selected_plan is not None:
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button("🔙 Back to all plans", use_container_width=True):
+                    st.session_state.selected_plan = None
+                    self.ui.chat_history.clear()
+                    st.rerun()
+
+            with col2:
+                # Handle generate button click
+                # Handle button click event
+                if st.button(button_text, use_container_width=True):
+                    # Operation when button is clicked
+                    self._handle_generate_click()
+        else:
+            if st.button(button_text, use_container_width=True):
+                # Operation when button is clicked
+                self._handle_generate_click()
 
         # Display itineraries if available
-        self.ui.display_itineraries()
+        if st.session_state.itineraries:
+            self.ui.display_itineraries()
+        else:
+            st.markdown(
+                """<div style="height: 200px; overflow-y: auto; border: 0px solid #ccc; padding: 10px;"></div>""",
+                unsafe_allow_html=True,
+            )
+
+        # Footer
+        with st.container():
+            footer = """
+        <style>
+        .footer {
+            left: 0;
+            bottom:0;
+            width: 100%;
+            text-align: center;
+            padding: 200px;
+            background-color: white;
+            z-index: 1000;
+            overflow:auto;
+        }
+
+        .footer .divider {
+            border: 0;
+            border-top: 3px solid #00BFFF;
+            width: 100%;
+            margin: 0 auto 15px auto;
+            opacity: 0.6;
+        }
+        .footer-text {
+            font-size: 18px;
+            font-family: 'Arial', sans-serif;
+            letter-spacing: 1px;
+        }
+        .footer a.streamlit {
+            color: #FF4500;  /* Orange Red for Streamlit */
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .footer a.azure {
+            color: #1E90FF;  /* Dodger Blue for Azure */
+            text-decoration: none;
+            font-weight: bold;
+        }
+        </style>
+
+        <div class="footer">
+            <div class="divider"></div>
+            <div class="footer-text">
+                Powered by <a href="https://www.streamlit.io" target="_blank" class="streamlit">Streamlit</a> & <a href="https://azure.microsoft.com" target="_blank" class="azure">Azure</a> ✨
+            </div>
+        </div>
+        """
+
+        st.markdown(footer, unsafe_allow_html=True)
 
     def _get_generate_button_text(self):
         """Get the generate button text based on selected language"""
@@ -1808,6 +1834,9 @@ class TravelApp:
 
     def _handle_generate_click(self):
         """Handle generate button click event"""
+        self.ui.chat_history.clear()
+        st.session_state.itineraries = None
+
         # Create config from UI inputs
         self.config = self.ui.get_current_config()
 
@@ -1820,6 +1849,7 @@ class TravelApp:
         # Save to session state
         st.session_state.itineraries = itineraries
         st.session_state.selected_plan = None
+        st.rerun()
 
 
 if __name__ == "__main__":

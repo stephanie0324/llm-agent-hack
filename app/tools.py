@@ -96,12 +96,12 @@ def search_flight(
         Include checked luggage: {'Yes' if with_luggage else 'No'}.
         Non-stop flight: {'Yes' if non_stop else 'No'}.
         Please return at least 10 flight options that fall within the budget, including round-trip flights with details 
-        such as flight times, layovers, pricing, and booking links for each option.
+        such as flight times, layovers, pricing, currency, and booking links for each option.
         """
         return get_response_from_ai_service(query)
 
     except requests.exceptions.RequestException as e:
-        return f"❌ Error: Unable to retrieve flight data for {departure_city} to {destination_city}. {str(e)}"
+        return f"❌ Error: Unable to retrieve flight data from {departure_city} to {destination_city}. {str(e)}"
 
 
 @tool
@@ -136,7 +136,7 @@ def search_hotel(
         Minimum star rating: {hotel_rating}.
         Hotel type preference: {hotel_type}.
         Desired amenities: {amenities}.
-        Please return at least 10 hotel options that fall within the budget, including details such as pricing, 
+        Please return at least 10 hotel options that fall within the budget, including details such as pricing, currency, 
         location, amenities, and booking links for each hotel option.
         """
         return get_response_from_ai_service(query)
@@ -212,7 +212,7 @@ def search_and_generate_itinerary(
 
 @tool
 def format_itinerary(
-    raw_text: str, destination: str, trip_days: int, language: str
+    raw_text: str, destination: str, trip_days: int, language: str, currency: str
 ) -> List[ItineraryPlan]:
     """
     Converts the raw travel summary text into three formatted itinerary suggestions (List[ItineraryPlan]),
@@ -227,6 +227,7 @@ def format_itinerary(
         "title": str,
         "highlights": [str, str, ...],
         "total_cost": int,
+        "currency": str,
         "avg_per_day": float,
         "hotels": [
             {
@@ -283,10 +284,14 @@ def format_itinerary(
     The schedule in details, should include the start time, end time, the full activity name and a description, which is the introduction of the activity.
     The description can included some recommendations regarding to the place, restaurant or activities.
     The total cost should be the sum of all costs in the itinerary.
-    
+
+    For all prices:
+    - Set the currency to "{currency}".
+    - Ensure each hotel, flight, and the total cost explicitly includes the "currency" field.
 
     Location: {destination}
     Trip duration: {trip_days} days
+    Currency: {currency}
     Summary text as follows:
     ---
     {raw_text}
