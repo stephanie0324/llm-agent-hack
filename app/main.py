@@ -529,24 +529,36 @@ class TravelUI:
         """Update the current configuration from UI inputs"""
         self.config = self.get_current_config()
 
-    def setup_page(self):
+    def setup_page(self, **kwargs):
         st.set_page_config(page_title="Travel Buddy", page_icon="✈️", layout="wide")
-        self._setup_styles()
+        self._setup_styles(**kwargs)
         # Initialize or update config
         self.update_config()
 
-    def _setup_styles(self):
+    def _setup_styles(self, crop_ratio: float = 0.0, shift_ratio: float = 0.0):
+        """
+        crop_ratio: 左右各裁切比例 (0.0 ~ 0.5)，如 0.123
+        shift_ratio: 左右位移比例 (-1.0 ~ 1.0)，如 0.2
+        """
+        # 保留兩位小數
+        crop_pct = f"{crop_ratio * 100:.2f}%"
+        shift_pct = f"{shift_ratio * 100:.2f}%"
         background_image_url = "https://c1.wallpaperflare.com/preview/447/58/538/cloudscape-texture-cloud-sky-thumbnail.jpg"
+
         st.markdown(
             f"""
             <style>
-            [data-testid="stHeader"] {{
-                display: none;
-            }}
+            [data-testid="stHeader"] {{ display: none; }}
             .header-container {{
+                position: relative;
+                overflow: hidden;
                 text-align: center;
-                        background: url({background_image_url}) no-repeat center center fixed;
-                        background-size: cover;
+                background: url({background_image_url}) no-repeat center center fixed;
+                background-size: cover;
+                /* 左右裁切，可用小數百分比 */
+                clip-path: inset(0 {crop_pct} 0 {crop_pct});
+                /* 左右位移，可用小數百分比 */
+                transform: translateX({shift_pct});
                 padding: 40px;
                 box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
             }}
@@ -576,7 +588,7 @@ class TravelUI:
                     Your go-to travel assistant for the perfect vacation 🏖️
                 </div>
             </div>
-    """,
+            """,
             unsafe_allow_html=True,
         )
 
@@ -1055,8 +1067,15 @@ class TravelUI:
             st.error("No plan available for confirmation.")
             return
 
-        display_itinerary_html = self.display_chat_itinerary(plan, show_details=True)
-        st.markdown(display_itinerary_html, unsafe_allow_html=True)
+        def st_normal():
+            col, _, _ = st.columns([3, 1, 1])
+            return col
+
+        display_itinerary_html = self.display_chat_itinerary(
+            plan, show_details=True, limit_height=False
+        )
+        with st_normal():
+            st.markdown(display_itinerary_html, unsafe_allow_html=True)
 
     def _generate_plan_details(self, plan: dict) -> str:
         message = f"""
@@ -1068,13 +1087,13 @@ class TravelUI:
         <div style="display: flex; gap: 30px; margin-top: 20px;">            
             <!-- Left: Flight Booking Information -->
             <div style="flex: 1;">
-                <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">✈️ Flight Booking Information</h2>
+                <h4 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">✈️ Flight Booking Information</h4>
                 <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">"""
 
         for flight in plan["flights"]:
             message += f"""
                     <div style="border: 1px solid #dcdcdc; border-radius: 12px; padding: 20px; background: #f9fbfd;">
-                        <h3 style="margin-top: 0; color: #2980b9;">{flight['airline']}</h3>
+                        <h4 style="margin-top: 0; color: #2980b9;">{flight['airline']}</h4>
                         <p style="margin: 8px 0; color: #555;">🛫 Route: {flight['from']} ➔ {flight['to']}</p>
                         <p style="margin: 8px 0; color: #555;">📅 Date: {flight['start_date']} | Class: {flight['class']}</p>
                         <p style="margin: 8px 0; color: #555;">💰 Price: {plan['currency']} {flight['price']:,}</p>
@@ -1086,13 +1105,13 @@ class TravelUI:
             </div>
             <!-- Right: Hotel Booking Information -->
             <div style="flex: 1;">
-                <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">🏨 Hotel Booking Information</h2>
+                <h4 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">🏨 Hotel Booking Information</h4>
                 <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">"""
 
         for hotel in plan["hotels"]:
             message += f"""
                     <div style="border: 1px solid #dcdcdc; border-radius: 12px; padding: 20px; background: #f9fbfd;">
-                        <h3 style="margin-top: 0; color: #2980b9;">{hotel['name']}</h3>
+                        <h4 style="margin-top: 0; color: #2980b9;">{hotel['name']}</h4>
                         <p style="margin: 8px 0; color: #555;">⭐ Rating: <b>{hotel['rating']}</b></p>
                         <p style="margin: 8px 0; color: #555;">📅 Check-in: {hotel['start_date']} | Check-out: {hotel['end_date']}</p>
                         <p style="margin: 8px 0; color: #555;">💰 Price: {plan['currency']} {hotel['price']:,}</p>
@@ -1103,11 +1122,11 @@ class TravelUI:
                 </div>
             </div>
         </div>
-        <h2 style="color: #2c3e50; margin-top: 60px;">📅 Detailed Itinerary</h2>"""
+        <h2 style="color: #2c3e50; margin-top: 10px;">📅 Detailed Itinerary</h2>"""
 
         for day_index, day in enumerate(plan["details"], start=1):
             message += f"""
-            <div style="background: #ffffff; padding: 20px; border: 1px solid #dcdcdc; border-radius: 12px; margin-top: 30px;">
+            <div style="background: #ffffff; padding: 20px; border: 1px solid #dcdcdc; border-radius: 12px; margin-top: 10px;">
                 <h3 style="color: #2980b9; margin-bottom: 10px;">Day {day_index} ({day['date']})</h3>
                 <p style="margin-bottom: 15px; color: #555;">🏨 Hotel: <b>{day['hotel']['name']}</b></p>
                 <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
@@ -1138,7 +1157,7 @@ class TravelUI:
 
         return message
 
-    def display_chat_itinerary(self, plan, show_details=False):
+    def display_chat_itinerary(self, plan, show_details=False, limit_height=True):
         """Display itinerary in chat format with table schedule"""
         message = f"""
 <div style="padding: 25px; border-radius: 12px; border: 2px solid #1E90FF; margin: 15px 0; background-color: #ffffff; box-shadow: 0 2px 8px rgba(30, 144, 255, 0.1);">
@@ -1240,7 +1259,7 @@ class TravelUI:
 
 <span style="font-size: 14px;">📅 **Daily Schedule**:</span>
 
-<div style="max-height: 500px; overflow-y: auto; overflow-x: auto; margin: 10px 0;">
+<div style="{'max-height: 500px;' if limit_height else ''}overflow-y: auto; overflow-x: auto; margin: 10px 0;">
 <div style="min-width: 800px;">
 <table class="schedule-table" style="width: 100%; border-collapse: collapse; text-align: center; position: relative; font-family: Arial, sans-serif;">
 <thead style="position: sticky; top: 0; background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 2;">
@@ -1716,14 +1735,16 @@ class TravelApp:
         if "sidebar_visibility" not in st.session_state:
             st.session_state.sidebar_visibility = True
 
-    def setup(self):
+    def setup(self, **kwargs):
         """Setup the application"""
-        self.ui.setup_page()
+        self.ui.setup_page(**kwargs)
         self.initialize_session_state()
 
     def run(self):
         """Run the application"""
-        self.setup()
+        crop_ratio = 0.205 if st.session_state.get("page") == "confirmation" else 0.0
+        shift_ratio = -0.2035 if st.session_state.get("page") == "confirmation" else 0.0
+        self.setup(crop_ratio=crop_ratio, shift_ratio=shift_ratio)
 
         # Render sidebar and get configuration
         if st.session_state.sidebar_visibility:
