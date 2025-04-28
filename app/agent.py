@@ -43,11 +43,14 @@ def create_modify_itinerary_agent():
         Agent: A ReAct agent with tools for modifying itineraries
     """
     tools = [
+        get_weather,
+        search_flight,
+        search_hotel,
+        search_and_generate_itinerary,
+        format_itinerary,
         search_activities,
         get_travel_time,
         check_opening_hours,
-        get_weather,
-        format_itinerary,
     ]
 
     # Bind the tools to the LLM

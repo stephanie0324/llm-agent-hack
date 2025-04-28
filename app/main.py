@@ -9,18 +9,6 @@ import streamlit as st
 from agent import create_modify_itinerary_agent, create_travel_agent
 from mock_api import get_mock_itineraries, get_mock_modified_itinerary
 
-# Tool emoji mapping
-emoji_map = {
-    "search_web": "🔍",
-    "search_flights": "✈️",
-    "search_hotels": "🏨",
-    "search_activities": "🎯",
-    "search_restaurants": "🍽️",
-    "get_weather": "🌤️",
-    "get_exchange_rate": "💱",
-    "format_itinerary": "📅",
-}
-
 
 @dataclass
 class TravelPreferences:
@@ -133,11 +121,14 @@ class ItineraryPlanner:
         self.config = config
         self.agent = create_travel_agent()
         self.emoji_map = {
+            "get_weather": "⛅️",
             "search_flight": "✈️",
             "search_hotel": "🏨",
-            "get_weather": "⛅️",
             "search_and_generate_itinerary": "🗺️",
             "format_itinerary": "📋",
+            "search_activities": "🎯",
+            "get_travel_time": "🚗",
+            "check_opening_hours": "⏰",
         }
 
     def generate_prompt(self) -> str:
@@ -295,11 +286,14 @@ class ModifyItineraryAgent:
         self.config = config
         self.agent = create_modify_itinerary_agent()
         self.emoji_map = {
+            "get_weather": "⛅️",
+            "search_flight": "✈️",
+            "search_hotel": "🏨",
+            "search_and_generate_itinerary": "🗺️",
+            "format_itinerary": "📋",
             "search_activities": "🎯",
             "get_travel_time": "🚗",
             "check_opening_hours": "⏰",
-            "get_weather": "🌤️",
-            "format_itinerary": "📋",
         }
 
     def _generate_modification_prompt(
@@ -1081,82 +1075,44 @@ class TravelUI:
         display_itinerary_html = self.display_chat_itinerary(plan, show_details=True)
         st.markdown(display_itinerary_html, unsafe_allow_html=True)
 
-        st.markdown(
-            "🔽 Click the button below to automatically book the following items:"
-        )
-        st.markdown(
-            """
-        - 🛫 Flights (based on your preferred time and airline)
-        - 🏨 Hotels (with breakfast / near train stations)
-        - 🚖 Airport transfers and local transportation passes
-        - 🎟️ Attraction tickets (if included in the itinerary)
-        """
-        )
-
-        if not st.session_state.booking_done:
-            if st.button("✅ Book All (Flights, Hotels, Transport)"):
-                with st.spinner("⏳ Booking in progress... Please wait a moment."):
-                    time.sleep(5)  # 模擬API請求等待時間
-                st.success(
-                    "🎉 Booking confirmed! All items have been successfully arranged."
-                )
-                st.session_state.booking_done = True
-                st.rerun()
-        else:
-            if st.button("💳 Proceed to Payment"):
-                # Simulated payment flow
-                st.markdown("Please click the link below to complete your payment:")
-                st.markdown(
-                    "[🔗 Go to Payment Page](https://mockpayment.example.com/pay?plan_id=1234)",
-                    unsafe_allow_html=True,
-                )
-                st.info(
-                    "💡 You will receive an email confirmation once payment is complete."
-                )
-
-        # Get current plan
-        # current_plan = st.session_state.itineraries[st.session_state.selected_plan]
-
-        # Display detailed itinerary
-        # st.markdown("### Detailed Itinerary")
-        # selected_activities, modification_instruction = self.display_modification_ui(
-        #     current_plan, current_date=None
-        # )
-
-        # Handle modification if user submitted
-        # if selected_activities and modification_instruction:
-        #     modified_plan = self.handle_modification_result(
-        #         current_plan,
-        #         selected_activities,
-        #         modification_instruction,
-        #     )
-        #     st.rerun()
-
     def _generate_plan_details(self, plan: dict) -> str:
         message = f"""
 <div style="font-family: Arial, sans-serif; padding: 0px 20px;">
-    <h3 style="color: #34495e;">Hotel:</h3>
+<h3 style="color: #34495e;">Hotel Booking Information:</h3>
     <ul>
         """
         for hotel in plan["hotels"]:
-            message += f"<li>{hotel['name']} ({hotel['start_date']} ~ {hotel['end_date']}) - ${hotel['price']:,} - Rating: {hotel['rating']}</li>"
+            message += f"""
+<li>
+    <strong>{hotel['name']}</strong> (Rating: {hotel['rating']})
+    <br>Check-in: {hotel['start_date']} | Check-out: {hotel['end_date']}
+    <br>Price: ${hotel['price']:,}
+    <br><a href="{hotel['booking_link']}" target="_blank">🔗 Book Now</a>
+</li>
+            """
 
         message += f"""
-    </ul>
-    <h3 style="color: #34495e;">Flights:</h3>
+</ul>
+<h3 style="color: #34495e;">Flight Booking Information:</h3>
     <ul>
         """
 
         for flight in plan["flights"]:
-            message += f"<li>{flight['start_date']}: {flight['from']} ➔ {flight['to']} ({flight['airline']}, {flight['class']}, ${flight['price']:,})</li>"
-
-        message += "</ul>"
+            message += f"""
+<li>
+    <strong>{flight['airline']}</strong>
+    <br>Route: {flight['from']} ➔ {flight['to']}
+    <br>Date: {flight['start_date']} | Class: {flight['class']}
+    <br>Price: ${flight['price']:,}
+    <br><a href="{flight['booking_link']}" target="_blank">🔗 Book Now</a>
+</li>
+            """
 
         message += "<hr><h2 style='color: #2c3e50;'>Detailed Itinerary:</h2>"
 
-        for day in plan["details"]:
+        for day_index, day in enumerate(plan["details"], start=1):
             message += f"""<div style="margin-bottom: 30px;">
-        <h3 style="color: #2980b9;">{day['date']}</h3>
+        <h3 style="color: #2980b9;">Day {day_index} ({day['date']})</h3>
         <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
             <thead>
                 <tr style="background-color: #ecf0f1;">
@@ -1171,8 +1127,8 @@ class TravelUI:
 
             for item in day["schedule"]:
                 message += f"""<tr>
-                    <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['start_time']}</td>
-                    <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['end_time']}</td>
+                    <td style="border: 1px solid #bdc3c7; padding: 8px; background-color: #ecf0f1;">{item['start_time']}</td>
+                    <td style="border: 1px solid #bdc3c7; padding: 8px; background-color: #ecf0f1;">{item['end_time']}</td>
                     <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['activity']}</td>
                     <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['description']}</td>
                 </tr>

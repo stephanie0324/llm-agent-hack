@@ -84,7 +84,7 @@ def search_flight(
         non_stop (bool): Whether the user prefers a non-stop flight.
 
     Returns:
-        str: Flight search results with at least 10 options within budget.
+        str: Flight search results with at least 10 options within budget, including booking links.
     """
     try:
         query = f"""
@@ -96,7 +96,7 @@ def search_flight(
         Include checked luggage: {'Yes' if with_luggage else 'No'}.
         Non-stop flight: {'Yes' if non_stop else 'No'}.
         Please return at least 10 flight options that fall within the budget, including round-trip flights with details 
-        such as flight times, layovers, and pricing.
+        such as flight times, layovers, pricing, and booking links for each option.
         """
         return get_response_from_ai_service(query)
 
@@ -127,7 +127,7 @@ def search_hotel(
         amenities (str): Desired amenities (e.g., pool, gym, breakfast).
 
     Returns:
-        str: Hotel search results with at least 10 options within budget.
+        str: Hotel search results with at least 10 options within budget, including booking links.
     """
     try:
         query = f"""
@@ -137,7 +137,7 @@ def search_hotel(
         Hotel type preference: {hotel_type}.
         Desired amenities: {amenities}.
         Please return at least 10 hotel options that fall within the budget, including details such as pricing, 
-        location, and amenities.
+        location, amenities, and booking links for each hotel option.
         """
         return get_response_from_ai_service(query)
 
@@ -234,7 +234,8 @@ def format_itinerary(
                 "price": int,
                 "rating": float,
                 "start_date": str,
-                "end_date": str
+                "end_date": str,
+                "booking_link": str
             },
             ...
         ],
@@ -246,7 +247,8 @@ def format_itinerary(
                 "airline": str,
                 "class": str,
                 "check-in luggage": bool,
-                "price": int
+                "price": int,
+                "booking_link": str
             },
             ...
         ],
