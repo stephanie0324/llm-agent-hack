@@ -48,9 +48,9 @@ def create_modify_itinerary_agent():
         search_hotel,
         search_and_generate_itinerary,
         format_itinerary,
-        search_activities,
-        get_travel_time,
-        check_opening_hours,
+        # search_activities,
+        # get_travel_time,
+        # check_opening_hours,
     ]
 
     # Bind the tools to the LLM

@@ -540,6 +540,9 @@ class TravelUI:
         st.markdown(
             f"""
             <style>
+            [data-testid="stHeader"] {{
+                display: none;
+            }}
             .header-container {{
                 text-align: center;
                         background: url({background_image_url}) no-repeat center center fixed;
@@ -1221,7 +1224,7 @@ class TravelUI:
 <h1 style="font-size: 32px; color: #1E90FF; text-align: center; margin-bottom: 0px;">✨ {plan['title']}</h1>
 
 <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
-  {"".join([f'<span style="background-color: #f0f8ff; padding: 6px 12px; border-radius: 20px; border: 1px solid #1E90FF; font-size: 14px;">{highlight}</span>' for highlight in plan['highlights']])}
+  {"".join([f'<span style="background-color: #f0f8ff; padding: 6px 12px; border-radius: 20px; border: 1px solid #1E90FF; font-size: 14px; font-weight: bold;">#{highlight}</span>' for highlight in plan['highlights']])}
 </div>
 
 💰 **Total Cost**: {plan['currency']} {plan['total_cost']:,}
@@ -1387,11 +1390,11 @@ class TravelUI:
 
     def _get_time_style(self, hour: int) -> str:
         """Get background color gradient based on time of day"""
-        if 6 <= hour < 12:  # Morning
-            return "color: #2c3e50; background: linear-gradient(90deg, #fff4e6 0%, #fff8f0 100%)"
-        elif 12 <= hour < 18:  # Afternoon
+        if 6 <= hour < 11:  # Morning
             return "color: #2c3e50; background: linear-gradient(90deg, #e6f3ff 0%, #f0f8ff 100%)"
-        elif 18 <= hour < 22:  # Evening
+        elif 11 <= hour < 15:  # Afternoon
+            return "color: #2c3e50; background: linear-gradient(90deg, #fff4e6 0%, #fff8f0 100%)"
+        elif 15 <= hour < 20:  # Evening
             return "background: linear-gradient(90deg, #fff0f5 0%, #fff5fa 100%)"
         else:  # Night
             background_style = """color: #FFFFFF; 

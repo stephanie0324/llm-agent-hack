@@ -88,7 +88,7 @@ def search_flight(
     """
     try:
         query = f"""
-        Search for return flights from {departure_city} to {destination_city} between {start_date} and {end_date}.
+        Search for round-trip flights from {departure_city} to {destination_city} between {start_date} and {end_date}.
         The user has a budget of ${flight_budget}. 
         Flight class preference: {flight_class}.
         Preferred flight time: {flight_time_pref}.
