@@ -1060,70 +1060,79 @@ class TravelUI:
 
     def _generate_plan_details(self, plan: dict) -> str:
         message = f"""
-<div style="font-family: Arial, sans-serif; padding: 0px 20px;">
-<h3 style="color: #34495e;">Hotel Booking Information:</h3>
-    <ul>
-        """
-        for hotel in plan["hotels"]:
-            message += f"""
-<li>
-    <strong>{hotel['name']}</strong> (Rating: {hotel['rating']})
-    <br>Check-in: {hotel['start_date']} | Check-out: {hotel['end_date']}
-    <br>Price: {plan['currency']} {hotel['price']:,}
-    <br><a href="{hotel['booking_link']}" target="_blank">🔗 Book Now</a>
-</li>
-            """
+<div style="font-family: Arial, sans-serif; padding: 20px;">
+<div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">"""
 
+        # 外層先改成左右兩欄
         message += f"""
-</ul>
-<h3 style="color: #34495e;">Flight Booking Information:</h3>
-    <ul>
-        """
+        <div style="display: flex; gap: 30px; margin-top: 20px;">            
+            <!-- Left: Flight Booking Information -->
+            <div style="flex: 1;">
+                <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">✈️ Flight Booking Information</h2>
+                <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">"""
 
         for flight in plan["flights"]:
             message += f"""
-<li>
-    <strong>{flight['airline']}</strong>
-    <br>Route: {flight['from']} ➔ {flight['to']}
-    <br>Date: {flight['start_date']} | Class: {flight['class']}
-    <br>Price: {plan['currency']} {flight['price']:,}
-    <br><a href="{flight['booking_link']}" target="_blank">🔗 Book Now</a>
-</li>
-            """
+                    <div style="border: 1px solid #dcdcdc; border-radius: 12px; padding: 20px; background: #f9fbfd;">
+                        <h3 style="margin-top: 0; color: #2980b9;">{flight['airline']}</h3>
+                        <p style="margin: 8px 0; color: #555;">🛫 Route: {flight['from']} ➔ {flight['to']}</p>
+                        <p style="margin: 8px 0; color: #555;">📅 Date: {flight['start_date']} | Class: {flight['class']}</p>
+                        <p style="margin: 8px 0; color: #555;">💰 Price: {plan['currency']} {flight['price']:,}</p>
+                        <a href="{flight['booking_link']}" target="_blank" style="display: inline-block; margin-top: 10px; padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 8px;">🔗 Book Now</a>
+                    </div>"""
 
-        message += "<hr><h2 style='color: #2c3e50;'>Detailed Itinerary:</h2>"
+        message += """
+                </div>
+            </div>
+            <!-- Right: Hotel Booking Information -->
+            <div style="flex: 1;">
+                <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px;">🏨 Hotel Booking Information</h2>
+                <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 20px;">"""
+
+        for hotel in plan["hotels"]:
+            message += f"""
+                    <div style="border: 1px solid #dcdcdc; border-radius: 12px; padding: 20px; background: #f9fbfd;">
+                        <h3 style="margin-top: 0; color: #2980b9;">{hotel['name']}</h3>
+                        <p style="margin: 8px 0; color: #555;">⭐ Rating: <b>{hotel['rating']}</b></p>
+                        <p style="margin: 8px 0; color: #555;">📅 Check-in: {hotel['start_date']} | Check-out: {hotel['end_date']}</p>
+                        <p style="margin: 8px 0; color: #555;">💰 Price: {plan['currency']} {hotel['price']:,}</p>
+                        <a href="{hotel['booking_link']}" target="_blank" style="display: inline-block; margin-top: 10px; padding: 8px 14px; background: #3498db; color: white; text-decoration: none; border-radius: 8px;">🔗 Book Now</a>
+                    </div>"""
+
+        message += f"""
+                </div>
+            </div>
+        </div>
+        <h2 style="color: #2c3e50; margin-top: 60px;">📅 Detailed Itinerary</h2>"""
 
         for day_index, day in enumerate(plan["details"], start=1):
-            message += f"""<div style="margin-bottom: 30px;">
-        <h3 style="color: #2980b9;">Day {day_index} ({day['date']})</h3>
-        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-            <thead>
-                <tr style="background-color: #ecf0f1;">
-                    <th style="border: 1px solid #bdc3c7; padding: 8px; width: 120px;">Start Time</th>
-                    <th style="border: 1px solid #bdc3c7; padding: 8px; width: 120px;">End Time</th>
-                    <th style="border: 1px solid #bdc3c7; padding: 8px;">Activity</th>
-                    <th style="border: 1px solid #bdc3c7; padding: 8px;">Description</th>
-                </tr>
-            </thead>
-            <tbody>
-            """
+            message += f"""
+            <div style="background: #ffffff; padding: 20px; border: 1px solid #dcdcdc; border-radius: 12px; margin-top: 30px;">
+                <h3 style="color: #2980b9; margin-bottom: 10px;">Day {day_index} ({day['date']})</h3>
+                <p style="margin-bottom: 15px; color: #555;">🏨 Hotel: <b>{day['hotel']['name']}</b></p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <thead>
+                        <tr style="background-color: #3498db; color: #ffffff;">
+                            <th style="padding: 10px; text-align: left; border-top-left-radius: 8px;">🕒 Time</th>
+                            <th style="padding: 10px; text-align: left;">🎯 Activity</th>
+                            <th style="padding: 10px; text-align: left; border-top-right-radius: 8px;">📝 Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>"""
 
-            for item in day["schedule"]:
-                message += f"""<tr>
-                    <td style="border: 1px solid #bdc3c7; padding: 8px; background-color: #ecf0f1;">{item['start_time']}</td>
-                    <td style="border: 1px solid #bdc3c7; padding: 8px; background-color: #ecf0f1;">{item['end_time']}</td>
-                    <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['activity']}</td>
-                    <td style="border: 1px solid #bdc3c7; padding: 8px;">{item['description']}</td>
-                </tr>
-                """
+            for idx, item in enumerate(day["schedule"]):
+                row_color = "#f2f9ff" if idx % 2 == 0 else "#ffffff"
+                message += f"""
+                    <tr style="background-color: {row_color}; border-bottom: 1px solid #dcdcdc;">
+                        <td style="padding: 10px;">{item['start_time']} - {item['end_time']}</td>
+                        <td style="padding: 10px;">{item['activity']}</td>
+                        <td style="padding: 10px;">{item['description']}</td>
+                    </tr>"""
 
-            message += """</tbody>
-        </table>
-        <p style="margin-top: 8px; font-style: italic; color: #7f8c8d;">Hotel: {}</p>
-    </div>
-            """.format(
-                day["hotel"]["name"]
-            )
+            message += """
+                    </tbody>
+                </table>
+            </div>"""
 
         message += "</div>"
 
@@ -1221,22 +1230,22 @@ class TravelUI:
     }});
 </script>
 
-<h1 style="font-size: 32px; color: #1E90FF; text-align: center; margin-bottom: 0px;">✨ {plan['title']}</h1>
+<h1 style="font-size: 40px; color: #1E90FF; text-align: center; margin-bottom: 0px;">✨ {plan['title']}</h1>
 
 <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
   {"".join([f'<span style="background-color: #f0f8ff; padding: 6px 12px; border-radius: 20px; border: 1px solid #1E90FF; font-size: 14px; font-weight: bold;">#{highlight}</span>' for highlight in plan['highlights']])}
 </div>
 
-💰 **Total Cost**: {plan['currency']} {plan['total_cost']:,}
+<span style="font-size: 14px;">💰 **Total Cost**: {plan['currency']} {plan['total_cost']:,}</span>
 
-📅 **Daily Schedule**:
+<span style="font-size: 14px;">📅 **Daily Schedule**:</span>
 
 <div style="max-height: 500px; overflow-y: auto; overflow-x: auto; margin: 10px 0;">
 <div style="min-width: 800px;">
 <table class="schedule-table" style="width: 100%; border-collapse: collapse; text-align: center; position: relative; font-family: Arial, sans-serif;">
 <thead style="position: sticky; top: 0; background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%); color: white; z-index: 2;">
 <tr>
-<th style="border: 1px solid #ddd; padding: 12px; min-width: 80px; width: 80px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">Time</th>
+<th style="border: 1px solid #ddd; padding: 12px; min-width: 80px; width: 80px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Time</th>
 """
         # Get all dates and format them as MM/DD
         dates = []
@@ -1251,9 +1260,9 @@ class TravelUI:
             date_obj = datetime.datetime.strptime(date, "%Y-%m-%d")
             day_of_week = date_obj.strftime("%a")
             formatted_dates.append(
-                f"{formatted_date}<br><span style='font-size: 13px; opacity: 0.9;'>{day_of_week}</span>"
+                f"{formatted_date}<br><span style='font-size: 14px; opacity: 0.9;'>{day_of_week}</span>"
             )
-            message += f'<th style="border: 1px solid #ddd; padding: 12px; min-width: 200px; width: 200px; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">{formatted_dates[-1]}</th>'
+            message += f'<th style="border: 1px solid #ddd; padding: 12px; min-width: 200px; width: 200px; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">{formatted_dates[-1]}</th>'
 
         message += """
 </tr>
@@ -1354,7 +1363,7 @@ class TravelUI:
                             if i < len(time_slots):
                                 skip_cells[date].add(time_slots[i])
 
-                cell_style = "border: 1px solid #ddd; padding: 12px; font-size: 14px;"
+                cell_style = "border: 1px solid #ddd; padding: 12px; font-size: 14px; font-weight: bold;"
                 if current_activity:
                     cell_style += (
                         " background-color: #ebf5ff; color: #2c3e50; font-weight: 500;"
