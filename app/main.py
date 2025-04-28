@@ -566,7 +566,7 @@ class TravelUI:
             }}
             </style>
             <div class="header-container">
-                <div class="header">
+                <div id="header" class="header">
                     ✈️ Travel Buddy
                 </div>
                 <div class="subheader">
@@ -657,8 +657,8 @@ class TravelUI:
             date_range = st.date_input(
                 "🗓️ Travel Dates (Start - End)",
                 [
-                    datetime.date.today() + datetime.timedelta(days=30),
-                    datetime.date.today() + datetime.timedelta(days=33),
+                    datetime.date.today() + datetime.timedelta(days=60),
+                    datetime.date.today() + datetime.timedelta(days=67),
                 ],
                 key="date_range",
             )
@@ -925,7 +925,7 @@ class TravelUI:
                     ):
                         thoughts = self.history.get_all_thoughts()[i // 2]
                         # Display the modification thoughts
-                        with st.expander("🤔 Agent's Thought Process", expanded=True):
+                        with st.expander("🤔 Agent's Thought Process", expanded=False):
                             st.markdown("### 📝 Modification Steps")
                             for j, thought in enumerate(thoughts, 1):
                                 if thought["type"] == "tool_call":
@@ -944,12 +944,26 @@ class TravelUI:
                     self.display_modification_ui(current_plan, current_date=None)
                 )
 
+                # Auto scroll to the modify-anchor
+                js = f"""
+<script>
+    var modify = window.parent.document.getElementById('modify-anchor-{(len(messages) - 1) // 2 - 1}');
+    modify.scrollIntoView({{ behavior: 'smooth' }});
+</script>"""
+                temp = st.empty()
+                with temp:
+                    st.components.v1.html(js)
+                    # To make sure the script can execute before being deleted
+                    time.sleep(0.5)
+                temp.empty()
+
                 # Handle modification if user submitted
                 if selected_activities and modification_instruction:
                     modified_plan = self.handle_modification_result(
                         current_plan,
                         selected_activities,
                         modification_instruction,
+                        (len(messages) - 1) // 2,
                     )
                     st.rerun()
 
@@ -978,7 +992,7 @@ class TravelUI:
             )
 
         # Create three columns for buttons
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([5, 4])
 
         # Modify button on the left
         with col1:
@@ -1009,6 +1023,19 @@ class TravelUI:
                 return selected_activities, modification_instruction
 
         if submit_clicked:
+            # Auto scroll to the top of the page
+            js = """
+<script>
+    var title = window.parent.document.getElementById('header');
+    title.scrollIntoView({ behavior: 'smooth' });
+</script>"""
+            temp = st.empty()
+            with temp:
+                st.components.v1.html(js)
+                # To make sure the script can execute before being deleted
+                time.sleep(0.5)
+            temp.empty()
+
             # Hide sidebar
             st.session_state.sidebar_visibility = False
             # Redirect to the final itinerary confirmation page
@@ -1101,8 +1128,6 @@ class TravelUI:
 
     def display_chat_itinerary(self, plan, show_details=False):
         """Display itinerary in chat format with table schedule"""
-        # print("plan")
-        # print(json.dumps(plan))
         message = f"""
 <div style="padding: 25px; border-radius: 12px; border: 2px solid #1E90FF; margin: 15px 0; background-color: #ffffff; box-shadow: 0 2px 8px rgba(30, 144, 255, 0.1);">
 <head>
@@ -1385,13 +1410,13 @@ class TravelUI:
             return background_style
 
     def handle_modification_result(
-        self, plan, selected_activities, modification_instruction
+        self, plan, selected_activities, modification_instruction, modification_idx
     ):
         with st.spinner("🤔 Thinking about your modification request..."):
             try:
                 # Add user's request to chat history
                 user_message = (
-                    "I would like to modify these activities:\n"
+                    f'<a id="modify-anchor-{modification_idx}"></a>I would like to modify these activities:\n'
                     + "\n".join(
                         [
                             f"- {act['date']} {self.format_time_range(act['time'])}~{self.format_time_range(act['end_time'])} {act['activity']}"
