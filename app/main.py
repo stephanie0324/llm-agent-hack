@@ -207,7 +207,7 @@ class ItineraryPlanner:
 
     def generate_itineraries(self):
         # Use mock data for development
-        return get_mock_itineraries()
+        # return get_mock_itineraries()
 
         prompt = self.generate_prompt()
 
@@ -273,7 +273,7 @@ class ItineraryPlanner:
                         raise Exception("No content received from agent")
 
             except Exception as e:
-                st.error(f"Error occurred: {str(e)}")
+                print(f"Error occurred: {str(e)}")
                 # If an error occurs, return mock data
                 return get_mock_itineraries()
             finally:
@@ -397,9 +397,9 @@ class ModifyItineraryAgent:
         history: ItineraryHistory,
     ) -> dict:
         # for development
-        return get_mock_modified_itinerary(
-            original_plan, selected_activities, modification_instruction
-        )
+        # return get_mock_modified_itinerary(
+        #     original_plan, selected_activities, modification_instruction
+        # )
 
         # Prepare prompt
         prompt = self._generate_modification_prompt(
@@ -510,7 +510,7 @@ class ModifyItineraryAgent:
                     raise Exception("No content received from agent")
 
         except Exception as e:
-            st.error(f"Error modifying itinerary: {str(e)}")
+            print(f"Error modifying itinerary: {str(e)}")
             return original_plan
         finally:
             # Ensure progress bar is completed
@@ -672,7 +672,7 @@ class TravelUI:
             date_range = st.date_input(
                 "🗓️ Travel Dates (Start - End)",
                 [
-                    datetime.date.today() + datetime.timedelta(days=60),
+                    datetime.date.today() + datetime.timedelta(days=64),
                     datetime.date.today() + datetime.timedelta(days=67),
                 ],
                 key="date_range",
@@ -820,31 +820,38 @@ class TravelUI:
                     key="flight_class",
                 )
 
-                col1, col2 = st.columns(2)
-                with col1:
+                f_col1, f_col2 = st.columns(2)
+                with f_col1:
                     st.selectbox(
                         "Flight Time",
                         ["Any", "Morning", "Afternoon", "Evening", "Red-eye"],
                         key="flight_time_pref",
                     )
-                with col2:
+                with f_col2:
                     st.text_input("Preferred Airline", key="airline_preference")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.checkbox("Checked Luggage", value=True, key="with_luggage")
-            with col2:
-                st.checkbox("Non Stop Flight", value=True, key="non_stop")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.checkbox("Checked Luggage", value=True, key="with_luggage")
+                with col2:
+                    st.checkbox("Non Stop Flight", value=True, key="non_stop")
 
-            st.markdown("### 🏨 Hotel Preferences")
-            col3, col4 = st.columns(2)
-            with col3:
-                st.select_slider(
-                    "Hotel Rating",
-                    ["1★", "2★", "3★", "4★", "5★"],
-                    value="3★",
-                    key="hotel_stars",
-                )
+                st.markdown("### 🏨 Hotel Preferences")
+                col3, col4 = st.columns(2)
+                with col3:
+                    st.select_slider(
+                        "Hotel Rating",
+                        ["1★", "2★", "3★", "4★", "5★"],
+                        value="3★",
+                        key="hotel_stars",
+                    )
+                with col4:
+                    st.multiselect(
+                        "Hotel Type",
+                        ["Hotel", "Hostel", "Airbnb", "Ryokan", "Capsule", "Resort"],
+                        key="hotel_type",
+                    )
+
                 st.multiselect(
                     "Hotel Features",
                     [
@@ -856,12 +863,6 @@ class TravelUI:
                     ],
                     default=["Non-smoking", "Breakfast Included", "Near Station"],
                     key="hotel_features",
-                )
-            with col4:
-                st.multiselect(
-                    "Hotel Type",
-                    ["Hotel", "Hostel", "Airbnb", "Ryokan", "Capsule", "Resort"],
-                    key="hotel_type",
                 )
 
     def render_itinerary_card(self, plan):
@@ -1128,7 +1129,7 @@ class TravelUI:
             message += f"""
             <div style="background: #ffffff; padding: 20px; border: 1px solid #dcdcdc; border-radius: 12px; margin-top: 10px;">
                 <h3 style="color: #2980b9; margin-bottom: 10px;">Day {day_index} ({day['date']})</h3>
-                <p style="margin-bottom: 15px; color: #555;">🏨 Hotel: <b>{day['hotel']['name']}</b></p>
+                <p style="margin-bottom: 15px; color: #555;">Hotel: <b>{day['hotel']['name']}</b></p>
                 <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
                     <thead>
                         <tr style="background-color: #3498db; color: #ffffff;">
@@ -1827,7 +1828,7 @@ class TravelApp:
             self.ui.display_itineraries()
         else:
             st.markdown(
-                """<div style="height: 200px; overflow-y: auto; border: 0px solid #ccc; padding: 10px;"></div>""",
+                """<div style="height: 400px; overflow-y: auto; border: 0px solid #ccc; padding: 10px;"></div>""",
                 unsafe_allow_html=True,
             )
 
