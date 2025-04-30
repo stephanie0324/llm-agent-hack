@@ -1,4 +1,1 @@
-*.gif filter=lfs diff=lfs merge=lfs -text
-examples/ItineraryCustomization.gif filter=lfs diff=lfs merge=lfs -text
-examples/ConfirmPage_PrintFeature_Demo.gif filter=lfs diff=lfs merge=lfs -text
 *.gif !text !filter !merge !diff
