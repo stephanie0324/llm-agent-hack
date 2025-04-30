@@ -193,7 +193,7 @@ Then open <http://localhost:8501> in your browser.
    - Complete booking on third-party sites
    - Export itinerary
 
-    ![ConfirmPage_PrintFeature_Demo](./examples/ConfirmPage_PrintFeature_Demo.gif)
+    ![ConfirmPage_PrintFeature_Demo](./examples/ConfirmPage_PrintFeature.gif)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
