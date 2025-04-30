@@ -73,7 +73,7 @@ Delivering a one-stop travel planning experience: from preferences → AI-genera
 
 ## Features
 
-![Agent-Framework](Agent-Framework.png)
+![Agent-Framework](./examples/Agent-Framework.png)
 
 - **Smart Itinerary Generation**  
   Generates three distinct day-by-day plans based on dates, budget, interests, companions, and travel style.
