@@ -4,7 +4,7 @@
 <a name="readme-top"></a>
 
 
-<h1 align="center"> Travel Buddy – Agent-Based Travel Planning System </h1>
+<h1 align="center"> Travel Buddy – Muli-Agent-Based Travel Planning System </h1>
 <h5 align="center">2025 Microsoft Hackathon </h5>
 <p align="center">
     <a href="https://github.com/FlagOpen/FlagEmbedding">
@@ -53,13 +53,15 @@
 
 ## Introduction
 
+![GeneratePlans](./examples/GeneratePlans.gif)
+
 Travel Buddy is an agentic system built in Python and Streamlit. It combines:
 
-- **Retrieval-Augmented Generation (RAG)** via Azure OpenAI
+- **Retrieval-Augmented Generation (RAG)** via Azure AI Agent with Bing Search
 - **Tool Calling** for weather, flight, hotel, and activity lookups
 - **Interactive UI** for multi-turn conversation and on-the-fly itinerary edits
 
-to deliver a one-stop travel planning experience: from preferences → AI-generated options → direct booking links.
+Delivering a one-stop travel planning experience: from preferences → AI-generated options → direct booking links.
 
 <div align="center">
 <p class="image-cropper">
@@ -71,11 +73,13 @@ to deliver a one-stop travel planning experience: from preferences → AI-genera
 
 ## Features
 
+![Agent-Framework](Agent-Framework.png)
+
 - **Smart Itinerary Generation**  
   Generates three distinct day-by-day plans based on dates, budget, interests, companions, and travel style.
 
 - **Retrieval-Augmented Generation (RAG)**  
-  Combines Azure OpenAI with Bing Search to fetch the latest travel information—opening hours, local events, hidden gems, and more.
+  Combines Azure AI Agent with Bing Search to fetch the latest travel information—opening hours, local events, hidden gems, and more.
 
 - **Real-Time Data Retrieval**  
   Fetch weather (Weatherbit), flight, and hotel suggestions via custom APIs or AI services.
@@ -167,32 +171,29 @@ Then open <http://localhost:8501> in your browser.
    - Travel Style: Luxury, Food
    - Interests: Museum, Nature
   
-    ![](./examples/SetPreferences.png)
+    ![SetPreferences](./examples/SetPreferences.png)
 
 2. **Generate Itineraries**
    - Click “Generate Itinerary”
    - Watch agent’s thought process & progress bar
    - View three summary cards, each with highlights and cost
-    <video width="1920" height="1080" controls>
-        <source src="./examples/GeneratePlans.mp4" type="video/mp4">
-    </video>
+    
+    ![GeneratePlans](./examples/GeneratePlans.gif)
 
 3. **View Details & Modify Itinerary**
    - Select “View Details” on a card
    - Check activities you want to change
    - Enter instructions (e.g., “Replace sushi dinner with a Michelin ramen”)
    - Receive a full updated plan
-    <video width="1920" height="1080" controls>
-        <source src="./examples/ItineraryCustomization.mp4" type="video/mp4">
-    </video>
+
+    ![ItineraryCustomization](./examples/ItineraryCustomization.gif)
 
 4. **Export Itinerary & Book**
    - Click “Book Now” links for flights & hotels
    - Complete booking on third-party sites
    - Export itinerary
-    <video width="1920" height="1080" controls>
-        <source src="./examples/ConfirmPage_PrintFeature_Demo.mkv" type="video/mp4">
-    </video>
+
+    ![ConfirmPage_PrintFeature_Demo](./examples/ConfirmPage_PrintFeature_Demo.gif)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
